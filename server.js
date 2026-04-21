@@ -1106,13 +1106,13 @@ async function buildTopCandidates(activeTicker) {
       url.searchParams.set("apiKey", apiKey);
       const payload = await fetchJson(url);
       const candles = (payload.results || []).map(mapAggregate);
-      if (candles.length < 20) {
+      if (candles.length < 4) {
         return null;
       }
       const historicalContext = buildHistoricalContext(candles);
       const last = candles[candles.length - 1];
-      const recent = candles.slice(-6);
-      const avgVolume = average(candles.slice(-12).map((candle) => candle.volume || 0)) || 1;
+      const recent = candles.slice(-Math.min(6, candles.length));
+      const avgVolume = average(candles.slice(-Math.min(12, candles.length)).map((candle) => candle.volume || 0)) || 1;
       const trendSlope = recent.reduce((sum, candle) => sum + (candle.close - candle.open), 0);
       const direction = historicalContext.threeDayDirection || (trendSlope >= 0 ? "bullish" : "bearish");
       const volumeRatio = (last.volume || avgVolume) / avgVolume;
@@ -1157,14 +1157,34 @@ async function buildTopCandidates(activeTicker) {
     }
   }));
 
-  return candidateResults
+  const ranked = candidateResults
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
     .slice(0, 10);
+
+  if (ranked.length) {
+    return ranked;
+  }
+
+  return [{
+    ticker: activeTicker,
+    lastPrice: 0,
+    direction: "bullish",
+    pressure: 0,
+    projectedProfit: 0,
+    projectedUnderlyingMove: 0,
+    volumeText: "No ranked list yet",
+    threeDayPattern: "Waiting for enough market history",
+    ceiling: 0,
+    floor: 0,
+    breakoutBias: 0,
+    sessionLabel: "Fallback board item",
+    score: 0
+  }];
 }
 
 function buildHistoricalContext(candles) {
-  const sample = candles.slice(-39);
+  const sample = candles.slice(-Math.min(39, candles.length));
   const avgClose = average(sample.map((candle) => candle.close));
   const avgVolume = average(sample.map((candle) => candle.volume || 0));
   const momentum = sample.reduce((sum, candle) => sum + (candle.close - candle.open), 0);
