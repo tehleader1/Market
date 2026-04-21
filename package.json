@@ -1,0 +1,9 @@
+{
+  "name": "anthony-figueroa-market",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Polygon-powered live candle and options pressure board.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

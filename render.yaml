@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: anthony-figueroa-market
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: POLYGON_API_KEY
+        sync: false
+      - key: ALPACA_API_KEY_ID
+        sync: false
+      - key: ALPACA_API_SECRET_KEY
+        sync: false
+      - key: ALPACA_API_BASE_URL
+        sync: false

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anthony Figueroa Market</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="dashboard">
+    <section class="panel ticker-panel">
+      <div class="panel-header">
+        <p class="eyebrow">Stock Option Signal Reader</p>
+        <h1>Live Candle Pressure Board</h1>
+      </div>
+
+      <label class="ticker-input-wrap" for="tickerInput">
+        <span>Ticker Symbol</span>
+        <div class="ticker-input-row">
+          <input id="tickerInput" type="text" value="SPY" maxlength="6" autocomplete="off">
+          <button id="applyTickerBtn" type="button">Load</button>
+        </div>
+      </label>
+
+      <div class="ticker-summary">
+        <div>
+          <span class="summary-label">Option Bias</span>
+          <strong id="biasLabel">Bullish Continuation</strong>
+        </div>
+        <div>
+          <span class="summary-label">30m Setup</span>
+          <strong id="setupLabel">Upper Wick Hold</strong>
+        </div>
+        <div>
+          <span class="summary-label">Tracked Contract</span>
+          <strong id="contractLabel">Waiting for Polygon data</strong>
+        </div>
+        <div>
+          <span class="summary-label">Feed Status</span>
+          <strong id="marketStatus">Initializing live market feed</strong>
+        </div>
+      </div>
+
+      <div class="access-panel">
+        <div class="section-title-row">
+          <h2>Permanent Access</h2>
+          <span id="deployStatus">Local only</span>
+        </div>
+        <p id="deployText" class="access-text">This board is still running locally. I will prepare it for a permanent hosted link so you can keep the readers alive when the network blocks `127.0.0.1`.</p>
+      </div>
+
+      <div class="flow-panel">
+        <div class="section-title-row">
+          <h2>Reader Flow</h2>
+          <span>one path</span>
+        </div>
+        <div id="flowSteps" class="flow-steps" aria-live="polite"></div>
+      </div>
+
+      <div class="main-reader" id="verdictReader">
+        <div class="main-reader-header">
+          <p class="eyebrow">Direction Verdict</p>
+          <strong id="verdictStatus">Waiting for clear direction</strong>
+        </div>
+        <div class="reader-lasers" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div id="verdictMetrics" class="reader-metrics">Bias metric rail waiting for data.</div>
+        <p id="verdictText">The board will spell out whether buyers or sellers are clearly in control so there is less room to misread the setup.</p>
+      </div>
+
+      <div class="main-reader" id="forecastReader">
+        <div class="main-reader-header">
+          <p class="eyebrow">Bell Window Volume Forecast</p>
+          <strong id="forecastStatus">Waiting for volume forecast</strong>
+        </div>
+        <div class="reader-lasers" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div id="forecastMetrics" class="reader-metrics">Window buildup rail waiting for data.</div>
+        <p id="forecastText">This reader will predict the opening-bell and 2:00 PM one-hour volume windows when we are outside them, then compare live volume when those windows are active.</p>
+      </div>
+
+      <div class="trade-config-panel">
+        <div class="section-title-row">
+          <h2>Trade Ticket</h2>
+          <span id="tradeDecisionBadge">Awaiting setup</span>
+        </div>
+        <div class="trade-grid">
+          <label class="trade-field">
+            <span>Budget</span>
+            <input id="budgetInput" type="number" min="0" step="1" value="400">
+          </label>
+          <label class="trade-field">
+            <span>Stock Symbol</span>
+            <input id="manualSymbolInput" type="text" maxlength="8" value="ENPH">
+          </label>
+          <label class="trade-field">
+            <span>Direction</span>
+            <select id="directionSelect">
+              <option value="bullish">Call / Up</option>
+              <option value="bearish">Put / Down</option>
+            </select>
+          </label>
+          <label class="trade-field">
+            <span>Strike Price</span>
+            <input id="strikeInput" type="number" min="0" step="0.01" value="650">
+          </label>
+          <label class="trade-field">
+            <span>Range Start</span>
+            <input id="rangeStartInput" type="number" min="0" step="0.01" value="45.06">
+          </label>
+          <label class="trade-field">
+            <span>Range End</span>
+            <input id="rangeEndInput" type="number" min="0" step="0.01" value="46.70">
+          </label>
+          <label class="trade-field">
+            <span>Expiration</span>
+            <input id="expirationInput" type="date">
+          </label>
+          <label class="trade-field">
+            <span>Target Gain</span>
+            <input id="targetGainInput" type="number" min="0" step="1" value="300">
+          </label>
+        </div>
+        <p id="tradeDecisionText" class="trade-decision-text">Set your budget, range anchors, and contract details, then arm the next 30 minute candle to read continuation versus reversal risk.</p>
+        <p class="trade-stats-note">Distance mode: the system measures the move between your range anchors and checks whether a 30 minute candle is building enough pressure to realistically complete that distance for the options play.</p>
+      </div>
+
+      <div class="touch-trade-panel">
+        <div class="section-title-row">
+          <h2>Touch Trade Trigger</h2>
+          <span id="armedStatus">System idle</span>
+        </div>
+        <button id="armTradeBtn" class="touch-trade-btn" type="button">Arm Next 30m Candle</button>
+        <p id="touchTradeText" class="touch-trade-text">Tap to evaluate whether the next 30 minute candle is over-pressured and whether the wick setup is strong enough before entering a live trade.</p>
+      </div>
+
+      <div class="pressure-stack-wrap">
+        <div class="section-title-row">
+          <h2>7 Stack Pressure Signals</h2>
+          <span id="stackScore">0 / 7 active</span>
+        </div>
+        <div id="pressureStack" class="pressure-stack" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="chart-header">
+        <div>
+          <p class="eyebrow">Live 30 Minute Candles</p>
+          <h2 id="chartTitle">SPY Options Flow</h2>
+        </div>
+        <div class="chart-price">
+          <span>Last</span>
+          <strong id="lastPrice">$0.00</strong>
+        </div>
+      </div>
+
+      <div class="main-reader" id="mainReader">
+        <div class="main-reader-header">
+          <p class="eyebrow">Main Reader</p>
+          <strong id="mainReaderStatus">Waiting for pressure alignment</strong>
+        </div>
+        <div class="reader-lasers" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div id="mainReaderMetrics" class="reader-metrics">Main continuation rail waiting for data.</div>
+        <p id="mainReaderText">The main reader will turn green when the wick is at least 75% of the candle body and delta, volume, and liquidity all point to strong continuation for the next candle.</p>
+      </div>
+
+      <div class="turbulence-reader" id="turbulenceReader">
+        <div class="main-reader-header">
+          <p class="eyebrow">Turbulence Reader</p>
+          <strong id="turbulenceReaderStatus">Scanning for sticky pressure</strong>
+        </div>
+        <div class="reader-lasers" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div id="turbulenceMetrics" class="reader-metrics">Whale lock rail waiting for data.</div>
+        <p id="turbulenceReaderText">The turbulence reader tracks repeated whale-sized reinforcement to decide whether the green light should stay locked on one direction or disengage as a fake-out.</p>
+      </div>
+
+      <div class="neutral-zone-reader" id="neutralZoneReader">
+        <div class="main-reader-header">
+          <p class="eyebrow">Neutral Zone</p>
+          <strong id="neutralZoneStatus">Watching anchor distance pressure</strong>
+        </div>
+        <div class="reader-lasers" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div id="neutralZoneMetrics" class="reader-metrics">Move map rail waiting for data.</div>
+        <p id="neutralZoneText">This reader highlights when wick pressure clears the 50% threshold and a 30 minute candle starts building enough real pressure to complete the distance between your range anchors for the options play.</p>
+      </div>
+
+      <div class="strike-reader" id="strikeReader">
+        <div class="main-reader-header">
+          <p class="eyebrow">Strike Reader</p>
+          <strong id="strikeReaderStatus">Waiting for strike confirmation</strong>
+        </div>
+        <div class="reader-lasers" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div id="strikeMetrics" class="reader-metrics">Strike payout rail waiting for data.</div>
+        <p id="strikeReaderText">This reader checks whether the exact strike price and option direction you chose are supported by the same pressure setup.</p>
+      </div>
+
+      <div class="chart-stage">
+        <canvas id="chartCanvas" width="1080" height="720" aria-label="Candlestick chart"></canvas>
+        <div id="centerIndicator" class="center-indicator is-off">
+          <span class="indicator-dot"></span>
+          <div>
+            <strong>Next 30m Wick Continuation</strong>
+            <p id="centerIndicatorText">Waiting for confirmation</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel metrics-panel">
+      <div class="panel-header">
+        <p class="eyebrow">Direction Confirmations</p>
+        <h2>Signal Console</h2>
+      </div>
+
+      <div class="top-list-panel">
+        <div class="section-title-row">
+          <h3>Top 10 Flow Board</h3>
+          <span id="topCandidatesStatus">Scanning near $55 zone</span>
+        </div>
+        <div id="topCandidates" class="top-candidates">
+          <p class="order-flow-empty">Waiting for top candidates.</p>
+        </div>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card">
+          <span>Delta</span>
+          <strong id="deltaValue">0.00</strong>
+          <p id="deltaHint">Neutral</p>
+        </article>
+        <article class="metric-card">
+          <span>Volume</span>
+          <strong id="volumeValue">0</strong>
+          <p id="volumeHint">No spike</p>
+        </article>
+        <article class="metric-card">
+          <span>Liquidity</span>
+          <strong id="liquidityValue">0%</strong>
+          <p id="liquidityHint">Balanced book</p>
+        </article>
+        <article class="metric-card accent-card">
+          <span>Pressure Reader</span>
+          <strong id="pressureValue">0%</strong>
+          <p id="pressureHint">No directional squeeze</p>
+        </article>
+      </div>
+
+      <div class="order-flow-panel">
+        <div class="section-title-row">
+          <h3>Buy / Sell Pressure</h3>
+          <span id="orderFlowStatus">Last 15 trades</span>
+        </div>
+        <div class="order-flow-gauge">
+          <div class="order-flow-bar">
+            <div id="buyFlowFill" class="order-flow-fill buy-flow-fill" style="width: 50%;"></div>
+            <div id="sellFlowFill" class="order-flow-fill sell-flow-fill" style="width: 50%;"></div>
+          </div>
+          <div class="order-flow-labels">
+            <strong id="buyFlowValue">50% buys</strong>
+            <strong id="sellFlowValue">50% sells</strong>
+          </div>
+          <p id="orderFlowSummary" class="order-flow-summary">The gauge reads the last 15 trade prints and shows whether buyers or sellers are pushing the other side out of view.</p>
+        </div>
+        <div id="orderFlowTape" class="order-flow-tape">
+          <p class="order-flow-empty">Waiting for live trade prints.</p>
+        </div>
+      </div>
+
+      <p id="errorBanner" class="error-banner" hidden></p>
+
+      <div class="signal-notes">
+        <h3>How This Board Reads Pressure</h3>
+        <p>Light green means the setup is tradable but still far from the bigger move. Dark green only shows when the system projects at least a $1,000 return on a $400 budget and is closing in on the larger breakout profile. The whole board can flip bearish when put pressure is stronger than call pressure.</p>
+      </div>
+
+      <div class="history-panel">
+        <div class="section-title-row">
+          <h3>Recorded History</h3>
+          <span id="historyStatus">3 hour snapshots</span>
+        </div>
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Ticker</th>
+                <th>Whales</th>
+                <th>Implied Move</th>
+                <th>Win Profile</th>
+                <th>Volume Burst</th>
+                <th>Delta</th>
+                <th>Liquidity</th>
+                <th>Pressure</th>
+                <th>Readiness</th>
+                <th>Wick</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <tr>
+                <td colspan="11">The board will start recording 3 hour indicator snapshots here.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
