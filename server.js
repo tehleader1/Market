@@ -1158,10 +1158,10 @@ async function buildTopCandidates(activeTicker) {
   const toDate = formatDate(now);
   const candidateResults = await Promise.all(symbols.map(async (symbol) => {
     try {
-      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/30/minute/${fromDate}/${toDate}`);
+      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/10/minute/${fromDate}/${toDate}`);
       url.searchParams.set("adjusted", "true");
       url.searchParams.set("sort", "asc");
-      url.searchParams.set("limit", "120");
+      url.searchParams.set("limit", "320");
       url.searchParams.set("apiKey", apiKey);
       const payload = await fetchJson(url);
       const candles = (payload.results || []).map(mapAggregate);
@@ -1212,24 +1212,28 @@ async function buildTopCandidates(activeTicker) {
         (direction === historicalContext.direction ? 8 : 0)
       );
 
-      return {
-        ticker: symbol,
-        lastPrice: last.close,
-        direction,
-        pressure: Math.round(pressure),
+        return {
+          ticker: symbol,
+          lastPrice: last.close,
+          direction,
+          pressure: Math.round(pressure),
         projectedProfit: Math.round(projectedProfit),
         projectedUnderlyingMove,
         topBottomTarget: topBottomSignal.target,
-        topBottomState: topBottomSignal.state,
-        topBottomLockScore: topBottomSignal.lockScore,
-        topBottomBreakoutChance: topBottomSignal.breakoutChance,
-        topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
-        topBottomTraderDriver: topBottomSignal.traderDriver,
-        volumeText: `${Math.round(last.volume || 0).toLocaleString()} / ${Math.round(avgVolume).toLocaleString()}`,
-        threeDayPattern: historicalContext.threeDayLabel,
-        ceiling: historicalContext.ceiling,
-        floor: historicalContext.floor,
-        breakoutBias: historicalContext.breakoutBias,
+          topBottomState: topBottomSignal.state,
+          topBottomLockScore: topBottomSignal.lockScore,
+          topBottomBreakoutChance: topBottomSignal.breakoutChance,
+          topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
+          topBottomTraderDriver: topBottomSignal.traderDriver,
+          topBottomBlowUpScore: topBottomSignal.blowUpScore,
+          topBottomStretchPercent: topBottomSignal.chartStretchPercent,
+          topBottomPulseMs: topBottomSignal.pulseMs,
+          timeframeLabel: topBottomSignal.timeframeLabel,
+          volumeText: `${Math.round(last.volume || 0).toLocaleString()} / ${Math.round(avgVolume).toLocaleString()}`,
+          threeDayPattern: historicalContext.threeDayLabel,
+          ceiling: historicalContext.ceiling,
+          floor: historicalContext.floor,
+          breakoutBias: historicalContext.breakoutBias,
         sessionLabel: buildVolumeForecast(candles).label,
         miniCandles: candles.slice(-16).map((candle) => candle.close),
         score
@@ -1261,6 +1265,10 @@ async function buildTopCandidates(activeTicker) {
     topBottomBreakoutChance: 0,
     topBottomBreakoutBiasLabel: "new higher high",
     topBottomTraderDriver: "normal_traders",
+    topBottomBlowUpScore: 0,
+    topBottomStretchPercent: 0,
+    topBottomPulseMs: 1800,
+    timeframeLabel: "10m scanner",
     volumeText: "No ranked list yet",
     threeDayPattern: "Waiting for enough market history",
     ceiling: 0,
@@ -1278,10 +1286,10 @@ async function buildCryptoCandidates() {
   const toDate = formatDate(now);
   const results = await Promise.all(CRYPTO_CANDIDATE_UNIVERSE.map(async (ticker) => {
     try {
-      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/30/minute/${fromDate}/${toDate}`);
+      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/10/minute/${fromDate}/${toDate}`);
       url.searchParams.set("adjusted", "true");
       url.searchParams.set("sort", "asc");
-      url.searchParams.set("limit", "160");
+      url.searchParams.set("limit", "520");
       url.searchParams.set("apiKey", apiKey);
       const payload = await fetchJson(url);
       const candles = (payload.results || []).map(mapAggregate);
@@ -1323,26 +1331,30 @@ async function buildCryptoCandidates() {
       const decimalOffset = Number(topBottomSignal.offset || 0).toFixed(last.close < 10 ? 5 : 2);
       const projectedMove = Math.max(0, historicalContext.volatility * (topBottomSignal.breakoutChance / 100) * 1.3);
       const score = topBottomSignal.lockScore * 0.6 + topBottomSignal.breakoutChance * 0.3 + pressure * 0.1;
-      return {
-        ticker: ticker.replace("X:", ""),
-        marketType: "crypto",
-        lastPrice: last.close,
-        direction,
+        return {
+          ticker: ticker.replace("X:", ""),
+          marketType: "crypto",
+          lastPrice: last.close,
+          direction,
         topBottomTarget: topBottomSignal.target,
-        topBottomState: topBottomSignal.state,
-        topBottomLockScore: topBottomSignal.lockScore,
-        topBottomBreakoutChance: topBottomSignal.breakoutChance,
-        topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
-        topBottomTraderDriver: "global traders",
-        decimalOffset,
-        projectedMove,
-        pressure: Math.round(pressure),
-        projectedProfit: Math.round(400 * (projectedMove / Math.max(0.0001, last.close * 0.015))),
-        threeDayPattern: `${historicalContext.threeDayLabel} • 24/7 crypto`,
-        contextNote: `24/7 crypto read. Decimal turn offset ${decimalOffset} with all-day enthusiasm watching for a ${topBottomSignal.breakoutBiasLabel}.`,
-        miniCandles: candles.slice(-16).map((candle) => candle.close),
-        score
-      };
+          topBottomState: topBottomSignal.state,
+          topBottomLockScore: topBottomSignal.lockScore,
+          topBottomBreakoutChance: topBottomSignal.breakoutChance,
+          topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
+          topBottomTraderDriver: "global traders",
+          topBottomBlowUpScore: topBottomSignal.blowUpScore,
+          topBottomStretchPercent: topBottomSignal.chartStretchPercent,
+          topBottomPulseMs: topBottomSignal.pulseMs,
+          timeframeLabel: topBottomSignal.timeframeLabel,
+          decimalOffset,
+          projectedMove,
+          pressure: Math.round(pressure),
+          projectedProfit: Math.round(400 * (projectedMove / Math.max(0.0001, last.close * 0.015))),
+          threeDayPattern: `${historicalContext.threeDayLabel} • 24/7 crypto`,
+          contextNote: `24/7 crypto read. ${topBottomSignal.timeframeLabel} blow-up ${topBottomSignal.blowUpScore.toFixed(0)}% with decimal turn offset ${decimalOffset} watching for a ${topBottomSignal.breakoutBiasLabel}.`,
+          miniCandles: candles.slice(-16).map((candle) => candle.close),
+          score
+        };
     } catch (error) {
       return null;
     }
@@ -1357,10 +1369,10 @@ async function buildForexCandidates() {
   const toDate = formatDate(now);
   const results = await Promise.all(FOREX_CANDIDATE_UNIVERSE.map(async (ticker) => {
     try {
-      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/30/minute/${fromDate}/${toDate}`);
+      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/10/minute/${fromDate}/${toDate}`);
       url.searchParams.set("adjusted", "true");
       url.searchParams.set("sort", "asc");
-      url.searchParams.set("limit", "160");
+      url.searchParams.set("limit", "720");
       url.searchParams.set("apiKey", apiKey);
       const payload = await fetchJson(url);
       const candles = (payload.results || []).map(mapAggregate);
@@ -1402,21 +1414,25 @@ async function buildForexCandidates() {
       const pipMultiplier = last.close >= 20 ? 100 : 10000;
       const pips = Math.abs(last.close - recent[0].close) * pipMultiplier;
       const score = topBottomSignal.lockScore * 0.52 + topBottomSignal.breakoutChance * 0.26 + Math.min(80, pips) * 0.22;
-      return {
-        ticker: ticker.replace("C:", ""),
-        marketType: "forex",
-        lastPrice: last.close,
-        direction,
+        return {
+          ticker: ticker.replace("C:", ""),
+          marketType: "forex",
+          lastPrice: last.close,
+          direction,
         topBottomTarget: topBottomSignal.target,
-        topBottomState: topBottomSignal.state,
-        topBottomLockScore: topBottomSignal.lockScore,
-        topBottomBreakoutChance: topBottomSignal.breakoutChance,
-        topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
-        topBottomTraderDriver: "global traders",
-        pipMove: pips,
-        projectedMove: historicalContext.volatility,
-        pressure: Math.round(pressure),
-        projectedProfit: Math.round(pips * 8),
+          topBottomState: topBottomSignal.state,
+          topBottomLockScore: topBottomSignal.lockScore,
+          topBottomBreakoutChance: topBottomSignal.breakoutChance,
+          topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
+          topBottomTraderDriver: "global traders",
+          topBottomBlowUpScore: topBottomSignal.blowUpScore,
+          topBottomStretchPercent: topBottomSignal.chartStretchPercent,
+          topBottomPulseMs: topBottomSignal.pulseMs,
+          timeframeLabel: topBottomSignal.timeframeLabel,
+          pipMove: pips,
+          projectedMove: historicalContext.volatility,
+          pressure: Math.round(pressure),
+          projectedProfit: Math.round(pips * 8),
         threeDayPattern: `${historicalContext.threeDayLabel} • forex spike`,
         contextNote: buildForexButterflyExplanation(ticker, direction, pips, topBottomSignal),
         miniCandles: candles.slice(-16).map((candle) => candle.close),
@@ -1433,7 +1449,97 @@ async function buildForexCandidates() {
 function buildForexButterflyExplanation(ticker, direction, pips, topBottomSignal) {
   const pair = ticker.replace("C:", "");
   const directionWord = direction === "bullish" ? "higher" : "lower";
-  return `Global butterfly read: 1. cross-market positioning is pushing ${pair} ${directionWord}; 2. session handoff is feeding the spike; 3. macro repricing is supporting a ${topBottomSignal.breakoutBiasLabel}. Current spike read ${pips.toFixed(0)} pips.`;
+  return `Global butterfly read: 1. cross-market positioning is pushing ${pair} ${directionWord}; 2. session handoff is feeding the spike; 3. macro repricing is supporting a ${topBottomSignal.breakoutBiasLabel}. ${topBottomSignal.timeframeLabel} blow-up read ${topBottomSignal.blowUpScore.toFixed(0)}% with ${pips.toFixed(0)} pips active.`;
+}
+
+function inferTimeframeMinutes(candles) {
+  const timestamps = candles
+    .slice(-Math.min(5, candles.length))
+    .map((candle) => Number(candle.timestamp || 0))
+    .filter(Boolean);
+
+  if (timestamps.length < 2) {
+    return 30;
+  }
+
+  const diffs = [];
+  for (let index = 1; index < timestamps.length; index += 1) {
+    const diff = (timestamps[index] - timestamps[index - 1]) / 60000;
+    if (diff > 0) {
+      diffs.push(diff);
+    }
+  }
+
+  if (!diffs.length) {
+    return 30;
+  }
+
+  const avg = average(diffs);
+  if (avg <= 11) {
+    return 10;
+  }
+  if (avg <= 35) {
+    return 30;
+  }
+  return Math.max(5, Math.round(avg / 5) * 5);
+}
+
+function buildBlowUpSignal({
+  candles,
+  direction,
+  pressure,
+  breakoutChance,
+  historicalContext,
+  manipulationCount,
+  breakoutCount,
+  unhookCount,
+  focusWindow
+}) {
+  const recent = candles.slice(-Math.min(6, candles.length));
+  const last = recent[recent.length - 1] || candles[candles.length - 1];
+  const first = recent[0] || last;
+  const directionSign = direction === "bullish" ? 1 : -1;
+  const sample = candles.slice(-Math.min(18, candles.length));
+  const avgRange = average(sample.map((candle) => Math.abs((candle.high || candle.close) - (candle.low || candle.close)))) || 0;
+  const avgBody = average(sample.map((candle) => Math.abs((candle.close || 0) - (candle.open || 0)))) || 0;
+  const currentRange = Math.abs((last.high || last.close) - (last.low || last.close));
+  const currentBody = Math.abs((last.close || 0) - (last.open || 0));
+  const priorBodies = recent.slice(0, -1).map((candle) => Math.abs((candle.close || 0) - (candle.open || 0)));
+  const burstBody = recent.slice(-3).reduce((sum, candle) => sum + Math.abs((candle.close || 0) - (candle.open || 0)), 0);
+  const directionalMove = Math.max(0, directionSign * ((last.close || 0) - (first.open || first.close || 0)));
+  const localHigh = Math.max(...recent.map((candle) => candle.high || candle.close || 0));
+  const localLow = Math.min(...recent.map((candle) => candle.low || candle.close || 0));
+  const localRange = Math.max(0.00001, localHigh - localLow);
+  const chartStretchPercent = clamp((directionalMove / Math.max(0.00001, localRange * 0.82)) * 100, 0, 100);
+  const rangeExpansion = clamp(((currentRange / Math.max(0.00001, avgRange || historicalContext.volatility || 0.01)) - 1) * 78, 0, 100);
+  const bodyExpansion = clamp(((currentBody / Math.max(0.00001, avgBody || historicalContext.volatility * 0.55 || 0.01)) - 1) * 74, 0, 100);
+  const acceleration = clamp(((burstBody / Math.max(0.00001, average(priorBodies) || avgBody || 0.01)) - 1) * 54, 0, 100);
+  const trendSupport = clamp(historicalContext.biasStrength * 100, 0, 100);
+  const breakoutWindowBoost = focusWindow.minutesToWindow <= 25 ? 8 : focusWindow.minutesToWindow <= 60 ? 3 : 0;
+  const blowUpScore = clamp(
+    chartStretchPercent * 0.34 +
+    rangeExpansion * 0.19 +
+    bodyExpansion * 0.13 +
+    acceleration * 0.11 +
+    breakoutChance * 0.11 +
+    pressure * 0.08 +
+    trendSupport * 0.07 +
+    manipulationCount * 3 +
+    breakoutCount * 3 +
+    breakoutWindowBoost -
+    unhookCount * 12,
+    0,
+    100
+  );
+
+  return {
+    timeframeMinutes: inferTimeframeMinutes(candles),
+    chartStretchPercent,
+    rangeExpansion,
+    bodyExpansion,
+    acceleration,
+    blowUpScore
+  };
 }
 
 function buildHistoricalContext(candles) {
@@ -1550,6 +1656,17 @@ function buildTopBottomSignal({
   const breakoutCount = Object.values(breakoutIndicators).filter(Boolean).length;
   const unhookCount = Object.values(unhookIndicators).filter(Boolean).length;
   const focusWindow = getFocusWindowState();
+  const blowUp = buildBlowUpSignal({
+    candles,
+    direction,
+    pressure,
+    breakoutChance: 0,
+    historicalContext,
+    manipulationCount,
+    breakoutCount,
+    unhookCount,
+    focusWindow
+  });
   const lockScore = clamp(
     manipulationCount * 18 +
     breakoutCount * 16 +
@@ -1568,9 +1685,22 @@ function buildTopBottomSignal({
     0,
     100
   );
+  const finalizedBlowUp = buildBlowUpSignal({
+    candles,
+    direction,
+    pressure,
+    breakoutChance,
+    historicalContext,
+    manipulationCount,
+    breakoutCount,
+    unhookCount,
+    focusWindow
+  });
+  const laserSpeedScore = clamp(lockScore * 0.48 + finalizedBlowUp.blowUpScore * 0.52, 0, 100);
   const ignitionScore = clamp(
     lockScore * 0.54 +
     breakoutChance * 0.34 +
+    finalizedBlowUp.blowUpScore * 0.18 +
     breakoutCount * 6 -
     unhookCount * 10 -
     (focusWindow.minutesToWindow > 50 ? 10 : 0),
@@ -1579,13 +1709,14 @@ function buildTopBottomSignal({
   );
   const state = unhookCount >= 2
     ? "unhooked"
-    : ignitionScore >= 96 && breakoutCount >= 2
+    : ignitionScore >= 96 && breakoutCount >= 2 && finalizedBlowUp.blowUpScore >= 88
       ? "ignited"
-      : lockScore >= 78 && breakoutCount >= 2
+      : laserSpeedScore >= 78 && breakoutCount >= 2
       ? "locked"
-      : lockScore >= 56
+      : laserSpeedScore >= 56
         ? "building"
         : "scanning";
+  const timeframeLabel = `${finalizedBlowUp.timeframeMinutes}m scanner`;
 
   return {
     target: direction === "bullish" ? "bottom" : "top",
@@ -1602,13 +1733,16 @@ function buildTopBottomSignal({
     lockScore,
     breakoutChance,
     ignitionScore,
-    pulseMs: lockScore >= 86 ? 420 : lockScore >= 72 ? 700 : lockScore >= 56 ? 1100 : 1800,
-    laserDensity: lockScore >= 86 ? 6 : lockScore >= 72 ? 5 : lockScore >= 56 ? 4 : 3,
+    blowUpScore: finalizedBlowUp.blowUpScore,
+    chartStretchPercent: finalizedBlowUp.chartStretchPercent,
+    pulseMs: ignitionScore >= 96 ? 240 : laserSpeedScore >= 92 ? 310 : laserSpeedScore >= 84 ? 440 : laserSpeedScore >= 72 ? 620 : laserSpeedScore >= 58 ? 900 : 1600,
+    laserDensity: finalizedBlowUp.blowUpScore >= 92 ? 8 : finalizedBlowUp.blowUpScore >= 82 ? 7 : laserSpeedScore >= 72 ? 6 : laserSpeedScore >= 58 ? 5 : 3,
     state,
     windowLabel: focusWindow.label,
     minutesToWindow: focusWindow.minutesToWindow,
     traderDriver: whaleInflux >= 26 ? "whales" : "normal_traders",
-    breakoutBiasLabel: direction === "bullish" ? "new higher high" : "new lower low"
+    breakoutBiasLabel: direction === "bullish" ? "new higher high" : "new lower low",
+    timeframeLabel
   };
 }
 

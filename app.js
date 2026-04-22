@@ -693,23 +693,26 @@ function renderCandidateBoard({ candidates, kind, emptyMessage, statusLabel }) {
     const stateClass = item.topBottomState === "ignited"
       ? " is-breathing is-dark-green"
       : item.topBottomState === "locked"
-        ? " is-dark-green"
-        : item.topBottomState === "building"
-          ? " is-soft-green"
-          : "";
+          ? " is-dark-green"
+          : item.topBottomState === "building"
+            ? " is-soft-green"
+            : "";
     const driverLabel = item.topBottomTraderDriver === "whales" ? "whales" : "normal traders";
+    const blowUpScore = Number(item.topBottomBlowUpScore || item.topBottomBreakoutChance || 0);
+    const stretchPercent = Number(item.topBottomStretchPercent || 0);
     const tertiary = item.marketType === "crypto"
       ? `${item.decimalOffset || "0.00000"} turn offset`
       : item.marketType === "forex"
-        ? `${Number(item.pipMove || 0).toFixed(0)} pips`
-        : `$${Number(item.projectedProfit || 0).toLocaleString()} est.`;
+          ? `${Number(item.pipMove || 0).toFixed(0)} pips`
+          : `$${Number(item.projectedProfit || 0).toLocaleString()} est.`;
     const miniChart = buildMiniChartSvg(item.miniCandles || [], item.direction);
     return `
-    <article class="candidate-item is-${item.direction}${stateClass}" style="--candidate-laser-speed:${item.topBottomState === "ignited" ? 360 : item.topBottomLockScore >= 80 ? 520 : item.topBottomLockScore >= 60 ? 900 : 1600}ms;">
+    <article class="candidate-item is-${item.direction}${stateClass}" style="--candidate-laser-speed:${Number(item.topBottomPulseMs || (item.topBottomState === "ignited" ? 360 : item.topBottomLockScore >= 80 ? 520 : item.topBottomLockScore >= 60 ? 900 : 1600))}ms;">
       <div class="candidate-lasers" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
       <div>
         <strong>#${start + index + 1} ${item.ticker}</strong>
         <p>${capitalize(item.direction)} • approaching ${item.topBottomTarget || "turn"} • ${item.threeDayPattern}</p>
+        <p class="candidate-subtext">${item.timeframeLabel || "Scanner"} blow-up ${blowUpScore.toFixed(0)}% • ${stretchPercent.toFixed(0)}% chart stretch</p>
         <p class="candidate-subtext">${capitalize(item.topBottomBreakoutBiasLabel || "breakout")} ${Number(item.topBottomBreakoutChance || 0).toFixed(0)}% • ${driverLabel}</p>
         <p class="candidate-subtext">${item.contextNote || ""}</p>
       </div>
@@ -928,6 +931,8 @@ function updateTopBottomReader(metrics, contract) {
   els.topBottomReader.style.setProperty("--laser-density", `${Math.max(3, Number(signal.laserDensity || 3))}`);
   setReaderMetricLine(els.topBottomMetrics, [
     `${capitalize(signal.target || (metrics.direction === "bullish" ? "bottom" : "top"))} watch`,
+    `${signal.timeframeLabel || "Scanner"} blow-up ${Number(signal.blowUpScore || 0).toFixed(0)}%`,
+    `${Number(signal.chartStretchPercent || 0).toFixed(0)}% chart stretch`,
     `Offset ${Number(signal.offset || 0).toFixed(2)}`,
     `Whales ${Number(signal.whaleInflux || 0).toFixed(0)}%`,
     `${capitalize(signal.breakoutBiasLabel || "breakout")} ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}%`,
@@ -936,13 +941,13 @@ function updateTopBottomReader(metrics, contract) {
 
   if (ignitionLive) {
     els.topBottomReaderStatus.textContent = `${capitalize(signal.target || "turn")} breakout live`;
-    els.topBottomReaderText.textContent = `The breakout is live now. The reader is holding a steady breathing glow for a few seconds because the ${signal.target || "turn"} ignition has fired in real time. Offset is $${Number(signal.offset || 0).toFixed(2)}, ${capitalize(signal.breakoutBiasLabel || "breakout")} read is ${Number(signal.breakoutChance || 0).toFixed(0)}%, and ignition is ${Number(signal.ignitionScore || 0).toFixed(0)}%. This is the chart-now state.`;
+    els.topBottomReaderText.textContent = `The breakout is live now. The reader is holding a steady breathing glow because the ${signal.timeframeLabel || "scanner"} blow-up read has fired in real time. Chart stretch is ${Number(signal.chartStretchPercent || 0).toFixed(0)}%, ${capitalize(signal.breakoutBiasLabel || "breakout")} read is ${Number(signal.breakoutChance || 0).toFixed(0)}%, and ignition is ${Number(signal.ignitionScore || 0).toFixed(0)}%. This is the chart-now state.`;
     return;
   }
 
   if (isLocked) {
     els.topBottomReaderStatus.textContent = `${capitalize(signal.target || "turn")} locked`;
-    els.topBottomReaderText.textContent = `The pulse is locking faster because manipulation around this ${signal.target || "turn"} has already been absorbed. Offset from the prior turn is $${Number(signal.offset || 0).toFixed(2)}, whale influx is ${Number(signal.whaleInflux || 0).toFixed(0)}% so this is being driven by ${signal.traderDriver === "whales" ? "whales" : "normal traders"}, ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}% is the current read for a ${signal.breakoutBiasLabel || "breakout"}, and ${signal.breakoutCount || 0} breakout indicators are active toward the ${signal.windowLabel || "focus window"}. ${Number(signal.minutesToWindow || 0)} minutes from that wave means the setup can still be strong while momentum timing may not be ready yet.`;
+    els.topBottomReaderText.textContent = `The pulse is locking faster because manipulation around this ${signal.target || "turn"} has already been absorbed. ${signal.timeframeLabel || "Scanner"} blow-up read is ${Number(signal.blowUpScore || 0).toFixed(0)}%, chart stretch is ${Number(signal.chartStretchPercent || 0).toFixed(0)}%, offset from the prior turn is $${Number(signal.offset || 0).toFixed(2)}, whale influx is ${Number(signal.whaleInflux || 0).toFixed(0)}% so this is being driven by ${signal.traderDriver === "whales" ? "whales" : "normal traders"}, ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}% is the current read for a ${signal.breakoutBiasLabel || "breakout"}, and ${signal.breakoutCount || 0} breakout indicators are active toward the ${signal.windowLabel || "focus window"}. ${Number(signal.minutesToWindow || 0)} minutes from that wave means the setup can still be strong while momentum timing may not be ready yet.`;
     return;
   }
 
@@ -955,7 +960,7 @@ function updateTopBottomReader(metrics, contract) {
   els.topBottomReaderStatus.textContent = isBuilding
     ? `${capitalize(signal.target || "turn")} building`
     : "Scanning for a real turn";
-  els.topBottomReaderText.textContent = `The system is tracking a similar ${signal.target || "turn"} with an offset that is close but not identical. Manipulation indicators active: ${signal.manipulationCount || 0}/3, breakout indicators active: ${signal.breakoutCount || 0}/3, unhook indicators active: ${signal.unhookCount || 0}/3. The current read for a ${signal.breakoutBiasLabel || "breakout"} is ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}%, and the move is ${Number(signal.minutesToWindow || 0)} minutes from the ${signal.windowLabel || "focus window"}, so the lock can build before the real momentum window is close enough.`;
+  els.topBottomReaderText.textContent = `The system is tracking a similar ${signal.target || "turn"} with an offset that is close but not identical. ${signal.timeframeLabel || "Scanner"} blow-up read is ${Number(signal.blowUpScore || 0).toFixed(0)}%, chart stretch is ${Number(signal.chartStretchPercent || 0).toFixed(0)}%, manipulation indicators active: ${signal.manipulationCount || 0}/3, breakout indicators active: ${signal.breakoutCount || 0}/3, unhook indicators active: ${signal.unhookCount || 0}/3. The current read for a ${signal.breakoutBiasLabel || "breakout"} is ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}%, and the move is ${Number(signal.minutesToWindow || 0)} minutes from the ${signal.windowLabel || "focus window"}, so the lock can build before the real momentum window is close enough.`;
 }
 
 function updateNeutralZoneReader(metrics, contract) {
