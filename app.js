@@ -624,7 +624,7 @@ function updateDeployPanel() {
 
 function renderTopCandidates(candidates) {
   els.topCandidatesStatus.textContent = candidates.length
-    ? `${candidates.length} names ranked for one-direction flow`
+    ? `${candidates.length} names ranked for top / bottom lock`
     : "Scanning near $55 zone";
 
   if (!candidates.length) {
@@ -636,11 +636,11 @@ function renderTopCandidates(candidates) {
     <article class="candidate-item is-${item.direction}">
       <div>
         <strong>#${index + 1} ${item.ticker}</strong>
-        <p>${capitalize(item.direction)} • ${item.threeDayPattern}</p>
+        <p>${capitalize(item.direction)} • approaching ${item.topBottomTarget || "turn"} • ${item.threeDayPattern}</p>
       </div>
       <div class="candidate-meta">
         <span>$${Number(item.lastPrice || 0).toFixed(2)}</span>
-        <span>${Number(item.pressure || 0).toFixed(0)}% pressure</span>
+        <span>${Number(item.topBottomLockScore || 0).toFixed(0)}% lock</span>
         <span>$${Number(item.projectedProfit || 0).toLocaleString()} est.</span>
       </div>
     </article>

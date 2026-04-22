@@ -1159,8 +1159,24 @@ async function buildTopCandidates(activeTicker) {
       const nearFiftyFive = 1 - Math.min(1, Math.abs(last.close - 55) / 18);
       const projectedUnderlyingMove = Math.max(0, historicalContext.volatility * (pressure / 100) * (1 + Math.abs(deltaProxy) * 0.5));
       const projectedProfit = Math.max(0, 400 * (projectedUnderlyingMove / Math.max(0.5, last.close * 0.018)) * (0.9 + pressure / 125));
+      const sessionFlow = buildSessionFlow(candles, direction, historicalContext);
+      const topBottomSignal = buildTopBottomSignal({
+        candles,
+        direction,
+        pressure,
+        delta: deltaProxy,
+        volumeRatio,
+        wickSupportsDirection: direction === "bullish" ? last.close >= last.open : last.close <= last.open,
+        wickSizeQualified: true,
+        historicalContext,
+        sessionFlow,
+        contractVolume: 0,
+        quoteDepth: 0,
+        openInterest: 0
+      });
       const score = (
-        pressure * 0.45 +
+        topBottomSignal.lockScore * 0.52 +
+        pressure * 0.25 +
         historicalContext.recentPushPercent * 0.12 +
         historicalContext.biasStrength * 18 +
         nearFiftyFive * 14 +
@@ -1174,6 +1190,9 @@ async function buildTopCandidates(activeTicker) {
         pressure: Math.round(pressure),
         projectedProfit: Math.round(projectedProfit),
         projectedUnderlyingMove,
+        topBottomTarget: topBottomSignal.target,
+        topBottomState: topBottomSignal.state,
+        topBottomLockScore: topBottomSignal.lockScore,
         volumeText: `${Math.round(last.volume || 0).toLocaleString()} / ${Math.round(avgVolume).toLocaleString()}`,
         threeDayPattern: historicalContext.threeDayLabel,
         ceiling: historicalContext.ceiling,
@@ -1203,6 +1222,9 @@ async function buildTopCandidates(activeTicker) {
     pressure: 0,
     projectedProfit: 0,
     projectedUnderlyingMove: 0,
+    topBottomTarget: "bottom",
+    topBottomState: "scanning",
+    topBottomLockScore: 0,
     volumeText: "No ranked list yet",
     threeDayPattern: "Waiting for enough market history",
     ceiling: 0,
