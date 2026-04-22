@@ -65,6 +65,10 @@ const state = {
     lockScore: 0,
     repeatWhaleScore: 0,
     disengaged: false
+  },
+  ignition: {
+    activeUntil: 0,
+    breathing: false
   }
 };
 
@@ -796,7 +800,18 @@ function updateTurbulenceReader(metrics, contract) {
 function updateTopBottomReader(metrics, contract) {
   const signal = metrics.topBottomSignal || {};
   const opportunity = getOpportunityProfile(metrics, contract);
-  const band = signal.state === "locked"
+  const now = Date.now();
+  if (signal.state === "ignited") {
+    state.ignition.activeUntil = now + 3200;
+    state.ignition.breathing = true;
+  } else if (state.ignition.activeUntil && now > state.ignition.activeUntil) {
+    state.ignition.breathing = false;
+  }
+
+  const ignitionLive = state.ignition.breathing && now <= state.ignition.activeUntil;
+  const band = ignitionLive
+    ? "dark"
+    : signal.state === "locked"
     ? opportunity.band === "off" ? "light" : opportunity.band
     : signal.state === "building"
       ? "light"
@@ -807,15 +822,22 @@ function updateTopBottomReader(metrics, contract) {
 
   setReaderBand(els.topBottomReader, band, metrics.direction);
   els.topBottomReader.classList.toggle("is-warning", isUnhooked);
-  els.topBottomReader.style.setProperty("--laser-speed", `${Number(signal.pulseMs || 1800)}ms`);
+  els.topBottomReader.classList.toggle("is-breathing", ignitionLive);
+  els.topBottomReader.style.setProperty("--laser-speed", `${ignitionLive ? 320 : Number(signal.pulseMs || 1800)}ms`);
   els.topBottomReader.style.setProperty("--laser-density", `${Math.max(3, Number(signal.laserDensity || 3))}`);
   setReaderMetricLine(els.topBottomMetrics, [
     `${capitalize(signal.target || (metrics.direction === "bullish" ? "bottom" : "top"))} watch`,
     `Offset ${Number(signal.offset || 0).toFixed(2)}`,
     `Whales ${Number(signal.whaleInflux || 0).toFixed(0)}%`,
     `${capitalize(signal.breakoutBiasLabel || "breakout")} ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}%`,
-    `Lock ${Number(signal.lockScore || 0).toFixed(0)}%`
+    `${ignitionLive ? "Ignition" : "Lock"} ${Number(signal.ignitionScore || signal.lockScore || 0).toFixed(0)}%`
   ]);
+
+  if (ignitionLive) {
+    els.topBottomReaderStatus.textContent = `${capitalize(signal.target || "turn")} breakout live`;
+    els.topBottomReaderText.textContent = `The breakout is live now. The reader is holding a steady breathing glow for a few seconds because the ${signal.target || "turn"} ignition has fired in real time. Offset is $${Number(signal.offset || 0).toFixed(2)}, ${capitalize(signal.breakoutBiasLabel || "breakout")} read is ${Number(signal.breakoutChance || 0).toFixed(0)}%, and ignition is ${Number(signal.ignitionScore || 0).toFixed(0)}%. This is the chart-now state.`;
+    return;
+  }
 
   if (isLocked) {
     els.topBottomReaderStatus.textContent = `${capitalize(signal.target || "turn")} locked`;

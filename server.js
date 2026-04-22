@@ -1367,9 +1367,20 @@ function buildTopBottomSignal({
     0,
     100
   );
+  const ignitionScore = clamp(
+    lockScore * 0.54 +
+    breakoutChance * 0.34 +
+    breakoutCount * 6 -
+    unhookCount * 10 -
+    (focusWindow.minutesToWindow > 50 ? 10 : 0),
+    0,
+    100
+  );
   const state = unhookCount >= 2
     ? "unhooked"
-    : lockScore >= 78 && breakoutCount >= 2
+    : ignitionScore >= 96 && breakoutCount >= 2
+      ? "ignited"
+      : lockScore >= 78 && breakoutCount >= 2
       ? "locked"
       : lockScore >= 56
         ? "building"
@@ -1389,6 +1400,7 @@ function buildTopBottomSignal({
     unhookCount,
     lockScore,
     breakoutChance,
+    ignitionScore,
     pulseMs: lockScore >= 86 ? 420 : lockScore >= 72 ? 700 : lockScore >= 56 ? 1100 : 1800,
     laserDensity: lockScore >= 86 ? 6 : lockScore >= 72 ? 5 : lockScore >= 56 ? 4 : 3,
     state,
