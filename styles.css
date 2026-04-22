@@ -322,6 +322,8 @@ button {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
+  --laser-speed: 2200ms;
+  --laser-density: 3;
 }
 
 .main-reader.is-on {
@@ -333,6 +335,7 @@ button {
 .main-reader.is-soft-green,
 .strike-reader.is-soft-green,
 .turbulence-reader.is-soft-green,
+.top-bottom-reader.is-soft-green,
 .neutral-zone-reader.is-soft-green {
   background: linear-gradient(135deg, rgba(151, 255, 190, 0.16), rgba(89, 217, 255, 0.1));
   border-color: rgba(151, 255, 190, 0.42);
@@ -341,6 +344,7 @@ button {
 .main-reader.is-dark-green,
 .strike-reader.is-dark-green,
 .turbulence-reader.is-dark-green,
+.top-bottom-reader.is-dark-green,
 .neutral-zone-reader.is-dark-green {
   background: linear-gradient(135deg, rgba(14, 168, 107, 0.28), rgba(97, 244, 166, 0.12));
   border-color: rgba(97, 244, 166, 0.72);
@@ -350,6 +354,7 @@ button {
 .main-reader.is-bearish,
 .strike-reader.is-bearish,
 .turbulence-reader.is-bearish,
+.top-bottom-reader.is-bearish,
 .neutral-zone-reader.is-bearish {
   border-color: rgba(255, 122, 122, 0.48);
   box-shadow: 0 0 26px rgba(255, 122, 122, 0.08);
@@ -388,15 +393,27 @@ button {
   inset: 0 auto 0 -30%;
   width: 40%;
   background: linear-gradient(90deg, transparent, rgba(89, 217, 255, 0.9), rgba(97, 244, 166, 0.95), transparent);
-  animation: laser-slide 2200ms linear infinite;
+  animation: laser-slide var(--laser-speed, 2200ms) linear infinite;
 }
 
 .reader-lasers span:nth-child(2)::before {
-  animation-duration: 1800ms;
+  animation-duration: calc(var(--laser-speed, 2200ms) * 0.82);
 }
 
 .reader-lasers span:nth-child(3)::before {
-  animation-duration: 2600ms;
+  animation-duration: calc(var(--laser-speed, 2200ms) * 1.18);
+}
+
+.reader-lasers span:nth-child(4)::before {
+  animation-duration: calc(var(--laser-speed, 2200ms) * 0.72);
+}
+
+.reader-lasers span:nth-child(5)::before {
+  animation-duration: calc(var(--laser-speed, 2200ms) * 1.32);
+}
+
+.reader-lasers span:nth-child(6)::before {
+  animation-duration: calc(var(--laser-speed, 2200ms) * 0.58);
 }
 
 .reader-metrics {
@@ -429,6 +446,26 @@ button {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
+}
+
+.top-bottom-reader {
+  margin: 0 8px 16px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.top-bottom-reader.is-warning {
+  border-color: rgba(255, 122, 122, 0.48);
+  background: linear-gradient(135deg, rgba(255, 122, 122, 0.14), rgba(255, 209, 103, 0.1));
+}
+
+.top-bottom-reader p:last-child {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .turbulence-reader.is-on {

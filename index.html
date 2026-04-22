@@ -176,6 +176,16 @@
         <p id="turbulenceReaderText">The turbulence reader tracks repeated whale-sized reinforcement to decide whether the green light should stay locked on one direction or disengage as a fake-out.</p>
       </div>
 
+      <div class="top-bottom-reader" id="topBottomReader">
+        <div class="main-reader-header">
+          <p class="eyebrow">Top / Bottom Lock</p>
+          <strong id="topBottomReaderStatus">Scanning for a real turn</strong>
+        </div>
+        <div class="reader-lasers" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        <div id="topBottomMetrics" class="reader-metrics">Turn lock rail waiting for data.</div>
+        <p id="topBottomReaderText">This reader watches similar tops and bottoms, whale influx, and historical pressure so the pulse only locks once the fakeout has already been absorbed.</p>
+      </div>
+
       <div class="neutral-zone-reader" id="neutralZoneReader">
         <div class="main-reader-header">
           <p class="eyebrow">Neutral Zone</p>

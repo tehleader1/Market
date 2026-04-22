@@ -736,6 +736,20 @@ function deriveMetrics(candles, contract, underlyingPrice, historicalContext) {
   const volumeForecast = buildVolumeForecast(candles);
   const sessionFlow = buildSessionFlow(candles, direction, historicalContext);
   const projectedUnderlyingMove = Math.max(0, historicalContext.volatility * (pressure / 100) * (1.1 + Math.abs(delta) * 0.55));
+  const topBottomSignal = buildTopBottomSignal({
+    candles,
+    direction,
+    pressure,
+    delta,
+    volumeRatio,
+    wickSupportsDirection,
+    wickSizeQualified,
+    historicalContext,
+    sessionFlow,
+    contractVolume: Number(contract.volume || 0),
+    quoteDepth: Number(contract.quoteDepth || 0),
+    openInterest: Number(contract.openInterest || 0)
+  });
 
   return {
     delta,
@@ -753,6 +767,7 @@ function deriveMetrics(candles, contract, underlyingPrice, historicalContext) {
     directionVerdict,
     volumeForecast,
     sessionFlow,
+    topBottomSignal,
     continuationReady,
     wickSupportsDirection,
     wickSizeQualified,
@@ -819,6 +834,20 @@ function deriveFallbackMetrics(candles, historicalContext) {
   const volumeForecast = buildVolumeForecast(candles);
   const sessionFlow = buildSessionFlow(candles, direction, historicalContext);
   const projectedUnderlyingMove = Math.max(0, historicalContext.volatility * (pressure / 100) * (1.05 + Math.abs(delta) * 0.45));
+  const topBottomSignal = buildTopBottomSignal({
+    candles,
+    direction,
+    pressure,
+    delta,
+    volumeRatio,
+    wickSupportsDirection,
+    wickSizeQualified,
+    historicalContext,
+    sessionFlow,
+    contractVolume: 0,
+    quoteDepth: 0,
+    openInterest: 0
+  });
 
   return {
     delta,
@@ -840,6 +869,7 @@ function deriveFallbackMetrics(candles, historicalContext) {
     directionVerdict,
     volumeForecast,
     sessionFlow,
+    topBottomSignal,
     continuationReady,
     wickSupportsDirection,
     wickSizeQualified,
@@ -1234,6 +1264,123 @@ function buildSessionFlow(candles, direction, historicalContext) {
     ceiling: historicalContext.ceiling,
     floor: historicalContext.floor
   };
+}
+
+function buildTopBottomSignal({
+  candles,
+  direction,
+  pressure,
+  delta,
+  volumeRatio,
+  wickSupportsDirection,
+  wickSizeQualified,
+  historicalContext,
+  sessionFlow,
+  contractVolume,
+  quoteDepth,
+  openInterest
+}) {
+  const recent = candles.slice(-Math.min(18, candles.length));
+  const last = recent[recent.length - 1];
+  const earlier = recent.slice(0, -1);
+  const currentExtreme = direction === "bullish" ? last.low : last.high;
+  const comparisonPoints = earlier.map((candle) => direction === "bullish" ? candle.low : candle.high);
+  const fallbackExtreme = direction === "bullish" ? historicalContext.floor : historicalContext.ceiling;
+  const anchorExtreme = comparisonPoints.length
+    ? comparisonPoints.reduce((closest, value) => (
+      Math.abs(value - currentExtreme) < Math.abs(closest - currentExtreme) ? value : closest
+    ), comparisonPoints[0])
+    : fallbackExtreme;
+  const offset = Math.abs(currentExtreme - anchorExtreme);
+  const normalizedOffset = offset / Math.max(0.01, historicalContext.volatility || 1);
+  const historicalPressureBalance = clamp(
+    pressure * 0.42 +
+    historicalContext.biasStrength * 34 +
+    historicalContext.breakoutBias * 24 +
+    Number(sessionFlow?.directionalPushPercent || 0) * 0.08,
+    0,
+    100
+  );
+  const whaleInflux = clamp(
+    (contractVolume / Math.max(1, openInterest || contractVolume || 1)) * 100 +
+    (quoteDepth / 10),
+    0,
+    100
+  );
+  const isNearSimilarTurn = normalizedOffset <= 1.15;
+  const manipulationIndicators = {
+    offset: isNearSimilarTurn,
+    influx: volumeRatio >= 1.08 || whaleInflux >= 32,
+    pressureBalance: historicalPressureBalance >= 58 && wickSupportsDirection
+  };
+  const breakoutIndicators = {
+    reclaim: pressure >= 62,
+    whaleHold: whaleInflux >= 26 || Math.abs(delta) >= 0.2,
+    windowUrgency: isFocusWindowActive()
+  };
+  const unhookIndicators = {
+    sideways: Number(sessionFlow?.directionalPushPercent || 0) <= 18,
+    fade: pressure < 48 || volumeRatio < 0.92,
+    manipulationDominant: !wickSupportsDirection || historicalPressureBalance < 48
+  };
+  const manipulationCount = Object.values(manipulationIndicators).filter(Boolean).length;
+  const breakoutCount = Object.values(breakoutIndicators).filter(Boolean).length;
+  const unhookCount = Object.values(unhookIndicators).filter(Boolean).length;
+  const lockScore = clamp(
+    manipulationCount * 18 +
+    breakoutCount * 16 +
+    historicalPressureBalance * 0.28 +
+    whaleInflux * 0.18 -
+    unhookCount * 14,
+    0,
+    100
+  );
+  const state = unhookCount >= 2
+    ? "unhooked"
+    : lockScore >= 78 && breakoutCount >= 2
+      ? "locked"
+      : lockScore >= 56
+        ? "building"
+        : "scanning";
+
+  return {
+    target: direction === "bullish" ? "bottom" : "top",
+    offset,
+    normalizedOffset,
+    historicalPressureBalance,
+    whaleInflux,
+    manipulationIndicators,
+    breakoutIndicators,
+    unhookIndicators,
+    manipulationCount,
+    breakoutCount,
+    unhookCount,
+    lockScore,
+    pulseMs: lockScore >= 86 ? 420 : lockScore >= 72 ? 700 : lockScore >= 56 ? 1100 : 1800,
+    laserDensity: lockScore >= 86 ? 6 : lockScore >= 72 ? 5 : lockScore >= 56 ? 4 : 3,
+    state,
+    windowLabel: getFocusWindowLabel()
+  };
+}
+
+function isFocusWindowActive() {
+  const parts = getEasternParts();
+  const minute = parts.hour * 60 + parts.minute;
+  const windows = [9 * 60 + 30, 14 * 60];
+  return windows.some((anchor) => Math.abs(anchor - minute) <= 45);
+}
+
+function getFocusWindowLabel() {
+  const parts = getEasternParts();
+  const minute = parts.hour * 60 + parts.minute;
+  const windows = [
+    { label: "9:30 AM bell", minute: 9 * 60 + 30 },
+    { label: "2:00 PM wave", minute: 14 * 60 }
+  ];
+  const closest = windows.reduce((best, item) => (
+    Math.abs(item.minute - minute) < Math.abs(best.minute - minute) ? item : best
+  ), windows[0]);
+  return closest.label;
 }
 
 function getWickWindow(lastTimestamp) {

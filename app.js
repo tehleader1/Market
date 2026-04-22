@@ -80,6 +80,9 @@ const els = {
   turbulenceReader: document.getElementById("turbulenceReader"),
   turbulenceReaderStatus: document.getElementById("turbulenceReaderStatus"),
   turbulenceReaderText: document.getElementById("turbulenceReaderText"),
+  topBottomReader: document.getElementById("topBottomReader"),
+  topBottomReaderStatus: document.getElementById("topBottomReaderStatus"),
+  topBottomReaderText: document.getElementById("topBottomReaderText"),
   neutralZoneReader: document.getElementById("neutralZoneReader"),
   neutralZoneStatus: document.getElementById("neutralZoneStatus"),
   neutralZoneText: document.getElementById("neutralZoneText"),
@@ -123,6 +126,7 @@ const els = {
   forecastMetrics: document.getElementById("forecastMetrics"),
   mainReaderMetrics: document.getElementById("mainReaderMetrics"),
   turbulenceMetrics: document.getElementById("turbulenceMetrics"),
+  topBottomMetrics: document.getElementById("topBottomMetrics"),
   neutralZoneMetrics: document.getElementById("neutralZoneMetrics"),
   strikeMetrics: document.getElementById("strikeMetrics"),
   armTradeBtn: document.getElementById("armTradeBtn"),
@@ -550,6 +554,7 @@ function updateUi() {
   updateVerdictReader(metrics, contract);
   updateForecastReader(metrics);
   updateTurbulenceReader(metrics, contract);
+  updateTopBottomReader(metrics, contract);
   updateNeutralZoneReader(metrics, contract);
   updateMainReader(metrics, contract);
   updateStrikeReader(metrics, contract);
@@ -659,6 +664,11 @@ function renderFlowSteps(metrics, contract) {
       label: "Pressure line",
       detail: `${metrics.pressure.toFixed(0)}% pressure • ${metrics.direction}`,
       active: metrics.pressure >= 60
+    },
+    {
+      label: "Top / bottom lock",
+      detail: `${capitalize(metrics.topBottomSignal?.target || "turn")} • ${Number(metrics.topBottomSignal?.lockScore || 0).toFixed(0)}%`,
+      active: ["building", "locked"].includes(metrics.topBottomSignal?.state)
     },
     {
       label: "Main reader",
@@ -781,6 +791,48 @@ function updateTurbulenceReader(metrics, contract) {
     ? `Loose hold ${state.turbulence.lockScore.toFixed(0)}%`
     : "Scanning for sticky pressure";
   els.turbulenceReaderText.textContent = `Turbulence check: ${repeatWhaleEntries} repeated whale-style entries, ${contractVolume.toLocaleString()} live contracts, quote depth ${quoteDepth.toLocaleString()}, pressure ${metrics.pressure.toFixed(0)}%, and stock-history bias ${(Number(history.biasStrength || 0) * 100).toFixed(0)}% ${history.direction || "neutral"}. The green light will stay slippery until repeated same-direction pressure locks it in.`;
+}
+
+function updateTopBottomReader(metrics, contract) {
+  const signal = metrics.topBottomSignal || {};
+  const opportunity = getOpportunityProfile(metrics, contract);
+  const band = signal.state === "locked"
+    ? opportunity.band === "off" ? "light" : opportunity.band
+    : signal.state === "building"
+      ? "light"
+      : "off";
+  const isUnhooked = signal.state === "unhooked";
+  const isLocked = signal.state === "locked";
+  const isBuilding = signal.state === "building";
+
+  setReaderBand(els.topBottomReader, band, metrics.direction);
+  els.topBottomReader.classList.toggle("is-warning", isUnhooked);
+  els.topBottomReader.style.setProperty("--laser-speed", `${Number(signal.pulseMs || 1800)}ms`);
+  els.topBottomReader.style.setProperty("--laser-density", `${Math.max(3, Number(signal.laserDensity || 3))}`);
+  setReaderMetricLine(els.topBottomMetrics, [
+    `${capitalize(signal.target || (metrics.direction === "bullish" ? "bottom" : "top"))} watch`,
+    `Offset ${Number(signal.offset || 0).toFixed(2)}`,
+    `Whales ${Number(signal.whaleInflux || 0).toFixed(0)}%`,
+    `Balance ${Number(signal.historicalPressureBalance || 0).toFixed(0)}%`,
+    `Lock ${Number(signal.lockScore || 0).toFixed(0)}%`
+  ]);
+
+  if (isLocked) {
+    els.topBottomReaderStatus.textContent = `${capitalize(signal.target || "turn")} locked`;
+    els.topBottomReaderText.textContent = `The pulse is locking faster because manipulation around this ${signal.target || "turn"} has already been absorbed. Offset from the prior turn is ${Number(signal.offset || 0).toFixed(2)}, whale influx is ${Number(signal.whaleInflux || 0).toFixed(0)}%, historical pressure balance is ${Number(signal.historicalPressureBalance || 0).toFixed(0)}%, and ${signal.breakoutCount || 0} breakout indicators are active into the ${signal.windowLabel || "focus window"}.`;
+    return;
+  }
+
+  if (isUnhooked) {
+    els.topBottomReaderStatus.textContent = `${capitalize(signal.target || "turn")} unhooked`;
+    els.topBottomReaderText.textContent = `This ${signal.target || "turn"} is wasting time. ${signal.unhookCount || 0} unhook indicators say it is drifting or consolidating too long, so the system is telling you to move on before fakeouts become stronger than the setup.`;
+    return;
+  }
+
+  els.topBottomReaderStatus.textContent = isBuilding
+    ? `${capitalize(signal.target || "turn")} building`
+    : "Scanning for a real turn";
+  els.topBottomReaderText.textContent = `The system is tracking a similar ${signal.target || "turn"} with an offset that is close but not identical. Manipulation indicators active: ${signal.manipulationCount || 0}/3, breakout indicators active: ${signal.breakoutCount || 0}/3, unhook indicators active: ${signal.unhookCount || 0}/3. The lasers speed up as the lock score rises so you can catch the real window before the 9:30 AM bell or 2:00 PM wave passes.`;
 }
 
 function updateNeutralZoneReader(metrics, contract) {
@@ -1083,6 +1135,7 @@ async function loadTicker(ticker) {
         liquidityHint: "No data",
         historicalContext: {},
         sessionFlow: {},
+        topBottomSignal: {},
         flags: {
           deltaBias: false,
           volumeBurst: false,
