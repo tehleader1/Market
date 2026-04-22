@@ -40,6 +40,7 @@ const HISTORY_STORAGE_KEY = "anthony-market-indicator-history-v1";
 const HISTORY_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const HISTORY_LIMIT = 80;
 const LIVE_REFRESH_MS = 5000;
+const TOP_CANDIDATES_PAGE_SIZE = 10;
 
 const state = {
   ticker: "SPY",
@@ -69,7 +70,8 @@ const state = {
   ignition: {
     activeUntil: 0,
     breathing: false
-  }
+  },
+  topCandidatesPage: 0
 };
 
 const els = {
@@ -148,6 +150,9 @@ const els = {
   tradeDecisionText: document.getElementById("tradeDecisionText"),
   topCandidatesStatus: document.getElementById("topCandidatesStatus"),
   topCandidates: document.getElementById("topCandidates"),
+  topCandidatesPrevBtn: document.getElementById("topCandidatesPrevBtn"),
+  topCandidatesNextBtn: document.getElementById("topCandidatesNextBtn"),
+  topCandidatesPage: document.getElementById("topCandidatesPage"),
   historyStatus: document.getElementById("historyStatus"),
   historyTableBody: document.getElementById("historyTableBody")
 };
@@ -632,15 +637,38 @@ function renderTopCandidates(candidates) {
     : "Scanning near $55 zone";
 
   if (!candidates.length) {
+    els.topCandidatesPage.textContent = "Page 1 of 1";
+    els.topCandidatesPrevBtn.disabled = true;
+    els.topCandidatesNextBtn.disabled = true;
     els.topCandidates.innerHTML = `<p class="order-flow-empty">Waiting for top candidates.</p>`;
     return;
   }
 
-  els.topCandidates.innerHTML = candidates.map((item, index) => `
-    <article class="candidate-item is-${item.direction}">
+  const pageCount = Math.max(1, Math.ceil(candidates.length / TOP_CANDIDATES_PAGE_SIZE));
+  state.topCandidatesPage = Math.max(0, Math.min(state.topCandidatesPage, pageCount - 1));
+  const start = state.topCandidatesPage * TOP_CANDIDATES_PAGE_SIZE;
+  const visible = candidates.slice(start, start + TOP_CANDIDATES_PAGE_SIZE);
+
+  els.topCandidatesPage.textContent = `Page ${state.topCandidatesPage + 1} of ${pageCount}`;
+  els.topCandidatesPrevBtn.disabled = state.topCandidatesPage === 0;
+  els.topCandidatesNextBtn.disabled = state.topCandidatesPage >= pageCount - 1;
+
+  els.topCandidates.innerHTML = visible.map((item, index) => {
+    const stateClass = item.topBottomState === "ignited"
+      ? " is-breathing is-dark-green"
+      : item.topBottomState === "locked"
+        ? " is-dark-green"
+        : item.topBottomState === "building"
+          ? " is-soft-green"
+          : "";
+    const driverLabel = item.topBottomTraderDriver === "whales" ? "whales" : "normal traders";
+    return `
+    <article class="candidate-item is-${item.direction}${stateClass}" style="--candidate-laser-speed:${item.topBottomState === "ignited" ? 360 : item.topBottomLockScore >= 80 ? 520 : item.topBottomLockScore >= 60 ? 900 : 1600}ms;">
+      <div class="candidate-lasers" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
       <div>
-        <strong>#${index + 1} ${item.ticker}</strong>
+        <strong>#${start + index + 1} ${item.ticker}</strong>
         <p>${capitalize(item.direction)} • approaching ${item.topBottomTarget || "turn"} • ${item.threeDayPattern}</p>
+        <p class="candidate-subtext">${capitalize(item.topBottomBreakoutBiasLabel || "breakout")} ${Number(item.topBottomBreakoutChance || 0).toFixed(0)}% • ${driverLabel}</p>
       </div>
       <div class="candidate-meta">
         <span>$${Number(item.lastPrice || 0).toFixed(2)}</span>
@@ -648,7 +676,8 @@ function renderTopCandidates(candidates) {
         <span>$${Number(item.projectedProfit || 0).toLocaleString()} est.</span>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function renderFlowSteps(metrics, contract) {
@@ -1252,6 +1281,18 @@ els.armTradeBtn.addEventListener("click", () => {
   if (state.dashboard?.metrics) {
     updateTouchTradePanel(state.dashboard.metrics);
   }
+});
+
+els.topCandidatesPrevBtn?.addEventListener("click", () => {
+  state.topCandidatesPage = Math.max(0, state.topCandidatesPage - 1);
+  renderTopCandidates(state.dashboard?.topCandidates || []);
+});
+
+els.topCandidatesNextBtn?.addEventListener("click", () => {
+  const total = state.dashboard?.topCandidates?.length || 0;
+  const pageCount = Math.max(1, Math.ceil(total / TOP_CANDIDATES_PAGE_SIZE));
+  state.topCandidatesPage = Math.min(pageCount - 1, state.topCandidatesPage + 1);
+  renderTopCandidates(state.dashboard?.topCandidates || []);
 });
 
 [

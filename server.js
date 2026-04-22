@@ -15,7 +15,10 @@ const MIME_TYPES = {
 };
 const TOP_CANDIDATE_UNIVERSE = [
   "SOFI", "PINS", "RBLX", "PATH", "U", "SNAP", "PLTR", "AFRM", "HOOD", "CFLT",
-  "LYFT", "UBER", "RIOT", "MARA", "F", "LCID", "RUN", "CHWY", "FUBO", "W"
+  "LYFT", "UBER", "RIOT", "MARA", "F", "LCID", "RUN", "CHWY", "FUBO", "W",
+  "SHOP", "SQ", "NIO", "DKNG", "ROKU", "SNOW", "AI", "HIMS", "CVNA", "UPST",
+  "ASTS", "TLRY", "AAL", "CCL", "DAL", "PFE", "BBAI", "SOUN", "CRSR", "RIVN",
+  "AMD", "INTC", "NVDA", "AAPL", "TSLA", "QQQ", "IWM", "SPY", "SMCI", "COIN"
 ];
 
 loadEnvFile();
@@ -1123,7 +1126,7 @@ function deriveOrderFlow(trades, underlyingPrice, loadError = "") {
 }
 
 async function buildTopCandidates(activeTicker) {
-  const symbols = Array.from(new Set([activeTicker, ...TOP_CANDIDATE_UNIVERSE])).slice(0, 18);
+  const symbols = Array.from(new Set([activeTicker, ...TOP_CANDIDATE_UNIVERSE])).slice(0, 36);
   const now = new Date();
   const fromDate = shiftDate(now, -7);
   const toDate = formatDate(now);
@@ -1193,6 +1196,9 @@ async function buildTopCandidates(activeTicker) {
         topBottomTarget: topBottomSignal.target,
         topBottomState: topBottomSignal.state,
         topBottomLockScore: topBottomSignal.lockScore,
+        topBottomBreakoutChance: topBottomSignal.breakoutChance,
+        topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
+        topBottomTraderDriver: topBottomSignal.traderDriver,
         volumeText: `${Math.round(last.volume || 0).toLocaleString()} / ${Math.round(avgVolume).toLocaleString()}`,
         threeDayPattern: historicalContext.threeDayLabel,
         ceiling: historicalContext.ceiling,
@@ -1209,7 +1215,7 @@ async function buildTopCandidates(activeTicker) {
   const ranked = candidateResults
     .filter(Boolean)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 10);
+    .slice(0, 24);
 
   if (ranked.length) {
     return ranked;
@@ -1225,6 +1231,9 @@ async function buildTopCandidates(activeTicker) {
     topBottomTarget: "bottom",
     topBottomState: "scanning",
     topBottomLockScore: 0,
+    topBottomBreakoutChance: 0,
+    topBottomBreakoutBiasLabel: "new higher high",
+    topBottomTraderDriver: "normal_traders",
     volumeText: "No ranked list yet",
     threeDayPattern: "Waiting for enough market history",
     ceiling: 0,
