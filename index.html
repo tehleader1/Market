@@ -10,6 +10,23 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div class="corner-auth" id="cornerAuth">
+    <button class="corner-auth-toggle" id="cornerAuthToggle" type="button" aria-expanded="false">Member Login</button>
+    <div class="corner-auth-panel" id="cornerAuthPanel" hidden>
+      <p class="eyebrow">Special Access</p>
+      <strong id="authStatus">Logged out</strong>
+      <p id="authText" class="corner-auth-text">Compact login for premium members without blocking the readers.</p>
+      <label class="trade-field corner-auth-field">
+        <span>Email</span>
+        <input id="authEmailInput" type="email" placeholder="name@email.com" />
+      </label>
+      <div class="corner-auth-actions">
+        <button id="googleLoginBtn" class="corner-auth-google" type="button">Continue with Google</button>
+        <button id="logoutBtn" class="corner-auth-logout" type="button">Logout</button>
+      </div>
+    </div>
+  </div>
+
   <main class="dashboard">
     <section class="panel ticker-panel">
       <div class="panel-header">
@@ -17,13 +34,26 @@
         <h1>Live Candle Pressure Board</h1>
       </div>
 
+      <div class="market-mode-panel">
+        <div class="section-title-row">
+          <h2>Main View</h2>
+          <span>stocks / crypto / forex</span>
+        </div>
+        <div class="market-mode-buttons" id="marketModeButtons">
+          <button class="market-mode-btn is-active" data-market="stock" type="button">Stocks</button>
+          <button class="market-mode-btn" data-market="crypto" type="button">Crypto</button>
+          <button class="market-mode-btn" data-market="forex" type="button">Forex</button>
+        </div>
+      </div>
+
       <label class="ticker-input-wrap" for="tickerInput">
-        <span>Ticker Symbol</span>
+        <span>Unified Search</span>
         <div class="ticker-input-row">
-          <input id="tickerInput" type="text" value="SPY" maxlength="6" autocomplete="off">
+          <input id="tickerInput" type="text" value="SPY" maxlength="16" autocomplete="off" list="marketSearchList" placeholder="Search stocks, crypto, or forex">
           <button id="applyTickerBtn" type="button">Load</button>
         </div>
       </label>
+      <datalist id="marketSearchList"></datalist>
 
       <div class="ticker-summary">
         <div>
@@ -58,6 +88,45 @@
           <span>one path</span>
         </div>
         <div id="flowSteps" class="flow-steps" aria-live="polite"></div>
+      </div>
+
+      <div class="monetize-panel">
+        <div class="section-title-row">
+          <h2>Premium Access</h2>
+          <span>quick tap / scan</span>
+        </div>
+        <div class="monetize-hero">
+          <p class="eyebrow">2026 AI Live Signals</p>
+          <strong id="offerPrice">$25,000</strong>
+          <p id="offerText" class="monetize-text">Default premium product price is set for the full live signals app. You can still switch to a custom amount before launch week.</p>
+        </div>
+        <div class="monetize-grid">
+          <label class="trade-field">
+            <span>Default App Price</span>
+            <input id="offerBaseInput" type="number" min="0" step="100" value="25000" />
+          </label>
+          <label class="trade-field">
+            <span>Custom Amount</span>
+            <input id="offerCustomInput" type="number" min="0" step="25" placeholder="Optional custom amount" />
+          </label>
+        </div>
+        <div class="payment-actions">
+          <a id="paymentPrimaryLink" class="payment-action primary" href="https://market-do8p.onrender.com/" target="_blank" rel="noreferrer">Open Premium Site</a>
+          <a id="paymentCashLink" class="payment-action" href="https://cash.app/" target="_blank" rel="noreferrer">Cash App</a>
+          <a id="paymentVenmoLink" class="payment-action" href="https://venmo.com/" target="_blank" rel="noreferrer">Venmo</a>
+          <a id="paymentWebLink" class="payment-action" href="https://market-do8p.onrender.com/" target="_blank" rel="noreferrer">Website .com Path</a>
+        </div>
+        <div class="payment-badges">
+          <span id="offerModeBadge">Default premium offer</span>
+          <span id="offerChannelBadge">Telegram + PWA ready</span>
+          <span id="offerSpeedBadge">Tap / scan on the go</span>
+        </div>
+        <div class="payment-scan">
+          <div class="payment-qr" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <p id="paymentScanText" class="monetize-text">This panel is the premium checkout feel for the final `.com`, Telegram funnel, and installable PWA. It is presentation-ready now and can be wired to real payments next.</p>
+        </div>
       </div>
 
       <div class="main-reader" id="verdictReader">
@@ -224,7 +293,7 @@
         <h2>Signal Console</h2>
       </div>
 
-      <div class="top-list-panel">
+      <div class="top-list-panel" id="topCandidatesSection">
         <div class="section-title-row">
           <h3>Top 10 Top / Bottom Board</h3>
           <span id="topCandidatesStatus">Scanning near $55 zone</span>
@@ -239,7 +308,7 @@
         </div>
       </div>
 
-      <div class="top-list-panel">
+      <div class="top-list-panel" id="cryptoCandidatesSection">
         <div class="section-title-row">
           <h3>Top 10 Crypto Tops / Bottoms</h3>
           <span id="cryptoCandidatesStatus">Scanning all-day crypto</span>
@@ -254,7 +323,7 @@
         </div>
       </div>
 
-      <div class="top-list-panel">
+      <div class="top-list-panel" id="forexCandidatesSection">
         <div class="section-title-row">
           <h3>Top 10 Forex Tops / Bottoms</h3>
           <span id="forexCandidatesStatus">Scanning global pips</span>

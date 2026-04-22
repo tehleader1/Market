@@ -37,13 +37,27 @@ const SIGNALS = [
 ];
 
 const HISTORY_STORAGE_KEY = "anthony-market-indicator-history-v1";
+const AUTH_STORAGE_KEY = "anthony-market-member-auth-v1";
 const HISTORY_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const HISTORY_LIMIT = 80;
 const LIVE_REFRESH_MS = 5000;
 const TOP_CANDIDATES_PAGE_SIZE = 10;
+const STOCK_SEARCH_UNIVERSE = [
+  "SPY", "QQQ", "IWM", "AAPL", "AMD", "NVDA", "TSLA", "RBLX", "PINS", "PLTR",
+  "SOFI", "HOOD", "COIN", "SMCI", "SHOP", "AFRM", "PATH", "SNOW", "DKNG", "UPST"
+];
+const CRYPTO_SEARCH_UNIVERSE = [
+  "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "ADAUSD", "DOGEUSD", "AVAXUSD", "LINKUSD",
+  "LTCUSD", "DOTUSD", "MATICUSD", "ATOMUSD", "UNIUSD", "NEARUSD", "APTUSD"
+];
+const FOREX_SEARCH_UNIVERSE = [
+  "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY",
+  "GBPJPY", "EURGBP", "AUDJPY", "CHFJPY", "XAUUSD"
+];
 
 const state = {
   ticker: "SPY",
+  marketMode: "stock",
   candles: [],
   dashboard: null,
   refreshTimer: null,
@@ -71,6 +85,7 @@ const state = {
     activeUntil: 0,
     breathing: false
   },
+  auth: loadAuthState(),
   topCandidatesPage: 0,
   cryptoCandidatesPage: 0,
   forexCandidatesPage: 0
@@ -78,7 +93,9 @@ const state = {
 
 const els = {
   tickerInput: document.getElementById("tickerInput"),
+  marketSearchList: document.getElementById("marketSearchList"),
   applyTickerBtn: document.getElementById("applyTickerBtn"),
+  marketModeButtons: document.getElementById("marketModeButtons"),
   chartCanvas: document.getElementById("chartCanvas"),
   chartTitle: document.getElementById("chartTitle"),
   lastPrice: document.getElementById("lastPrice"),
@@ -152,21 +169,38 @@ const els = {
   tradeDecisionText: document.getElementById("tradeDecisionText"),
   topCandidatesStatus: document.getElementById("topCandidatesStatus"),
   topCandidates: document.getElementById("topCandidates"),
+  topCandidatesSection: document.getElementById("topCandidatesSection"),
   topCandidatesPrevBtn: document.getElementById("topCandidatesPrevBtn"),
   topCandidatesNextBtn: document.getElementById("topCandidatesNextBtn"),
   topCandidatesPage: document.getElementById("topCandidatesPage"),
   cryptoCandidatesStatus: document.getElementById("cryptoCandidatesStatus"),
   cryptoCandidates: document.getElementById("cryptoCandidates"),
+  cryptoCandidatesSection: document.getElementById("cryptoCandidatesSection"),
   cryptoCandidatesPrevBtn: document.getElementById("cryptoCandidatesPrevBtn"),
   cryptoCandidatesNextBtn: document.getElementById("cryptoCandidatesNextBtn"),
   cryptoCandidatesPage: document.getElementById("cryptoCandidatesPage"),
   forexCandidatesStatus: document.getElementById("forexCandidatesStatus"),
   forexCandidates: document.getElementById("forexCandidates"),
+  forexCandidatesSection: document.getElementById("forexCandidatesSection"),
   forexCandidatesPrevBtn: document.getElementById("forexCandidatesPrevBtn"),
   forexCandidatesNextBtn: document.getElementById("forexCandidatesNextBtn"),
   forexCandidatesPage: document.getElementById("forexCandidatesPage"),
   historyStatus: document.getElementById("historyStatus"),
-  historyTableBody: document.getElementById("historyTableBody")
+  historyTableBody: document.getElementById("historyTableBody"),
+  cornerAuth: document.getElementById("cornerAuth"),
+  cornerAuthToggle: document.getElementById("cornerAuthToggle"),
+  cornerAuthPanel: document.getElementById("cornerAuthPanel"),
+  authStatus: document.getElementById("authStatus"),
+  authText: document.getElementById("authText"),
+  authEmailInput: document.getElementById("authEmailInput"),
+  googleLoginBtn: document.getElementById("googleLoginBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
+  offerPrice: document.getElementById("offerPrice"),
+  offerText: document.getElementById("offerText"),
+  offerBaseInput: document.getElementById("offerBaseInput"),
+  offerCustomInput: document.getElementById("offerCustomInput"),
+  offerModeBadge: document.getElementById("offerModeBadge"),
+  paymentScanText: document.getElementById("paymentScanText")
 };
 
 const ctx = els.chartCanvas.getContext("2d");
@@ -246,6 +280,129 @@ function saveHistoryEntries() {
   } catch (error) {
     // Ignore storage failures so the dashboard keeps running.
   }
+}
+
+function loadAuthState() {
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") {
+      return { loggedIn: false, email: "" };
+    }
+    return {
+      loggedIn: Boolean(parsed.loggedIn),
+      email: String(parsed.email || "")
+    };
+  } catch (error) {
+    return { loggedIn: false, email: "" };
+  }
+}
+
+function saveAuthState() {
+  try {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state.auth));
+  } catch (error) {
+    // Ignore storage failures so the dashboard keeps running.
+  }
+}
+
+function buildUnifiedSearchOptions() {
+  const options = [
+    ...STOCK_SEARCH_UNIVERSE.map((value) => ({ market: "stock", value })),
+    ...CRYPTO_SEARCH_UNIVERSE.map((value) => ({ market: "crypto", value })),
+    ...FOREX_SEARCH_UNIVERSE.map((value) => ({ market: "forex", value }))
+  ];
+  els.marketSearchList.innerHTML = options
+    .map((option) => `<option value="${option.value}">${option.market}</option>`)
+    .join("");
+}
+
+function normalizeMarketSearch(rawValue) {
+  const value = String(rawValue || "").trim().toUpperCase().replace(/^X:/, "").replace(/^C:/, "");
+  if (!value) {
+    return { market: "stock", symbol: "SPY" };
+  }
+  if (CRYPTO_SEARCH_UNIVERSE.includes(value)) {
+    return { market: "crypto", symbol: value };
+  }
+  if (FOREX_SEARCH_UNIVERSE.includes(value)) {
+    return { market: "forex", symbol: value };
+  }
+  return { market: "stock", symbol: value };
+}
+
+function setMarketMode(market, options = {}) {
+  state.marketMode = market;
+  const buttons = els.marketModeButtons?.querySelectorAll(".market-mode-btn") || [];
+  buttons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.market === market);
+  });
+
+  [
+    { market: "stock", element: els.topCandidatesSection },
+    { market: "crypto", element: els.cryptoCandidatesSection },
+    { market: "forex", element: els.forexCandidatesSection }
+  ].forEach((section) => {
+    section.element?.classList.toggle("is-focus", section.market === market);
+  });
+
+  if (!options.skipScroll) {
+    getSectionForMarket(market)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function getSectionForMarket(market) {
+  if (market === "crypto") {
+    return els.cryptoCandidatesSection;
+  }
+  if (market === "forex") {
+    return els.forexCandidatesSection;
+  }
+  return els.topCandidatesSection;
+}
+
+function handleUnifiedSearchSubmit() {
+  const selection = normalizeMarketSearch(els.tickerInput.value);
+  setMarketMode(selection.market);
+  els.tickerInput.value = selection.symbol;
+
+  if (selection.market === "stock") {
+    loadTicker(selection.symbol);
+    return;
+  }
+
+  els.marketStatus.textContent = selection.market === "crypto"
+    ? `Crypto scanner focused on ${selection.symbol}. Main options chart stays on the tracked stock ticker.`
+    : `Forex scanner focused on ${selection.symbol}. Main options chart stays on the tracked stock ticker.`;
+}
+
+function updateCornerAuthUi() {
+  els.authEmailInput.value = state.auth.email || "";
+  els.authStatus.textContent = state.auth.loggedIn
+    ? `Logged in${state.auth.email ? ` • ${state.auth.email}` : ""}`
+    : "Logged out";
+  els.authText.textContent = state.auth.loggedIn
+    ? "Premium member panel is active and ready for the private signal room."
+    : "Use the compact login so the board stays clean on the TV while still letting members in.";
+  els.logoutBtn.disabled = !state.auth.loggedIn;
+  els.cornerAuthToggle.textContent = state.auth.loggedIn ? "Logged in" : "Member Login";
+}
+
+function setCornerAuthOpen(isOpen) {
+  els.cornerAuthPanel.hidden = !isOpen;
+  els.cornerAuthToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+function updateOfferUi() {
+  const base = Math.max(0, Number(els.offerBaseInput.value || 0));
+  const custom = Math.max(0, Number(els.offerCustomInput.value || 0));
+  const price = custom > 0 ? custom : base;
+  els.offerPrice.textContent = `$${price.toLocaleString()}`;
+  els.offerModeBadge.textContent = custom > 0 ? "Custom premium offer" : "Default premium offer";
+  els.offerText.textContent = custom > 0
+    ? `Custom quick-pay amount is active at $${price.toLocaleString()}. This keeps the premium checkout flexible when money comes in on the go.`
+    : `Default premium product price is set at $${price.toLocaleString()} for the full live signals app. You can still switch to a custom amount before launch week.`;
+  els.paymentScanText.textContent = `This compact premium checkout panel is built for the final .com, Telegram funnel, and installable PWA. Current quick-pay amount is $${price.toLocaleString()}.`;
 }
 
 function getWhaleStats(metrics, contract) {
@@ -538,6 +695,9 @@ function updateUi() {
 
   const { metrics, contract, marketStatus, error, orderFlow, topCandidates, cryptoCandidates, forexCandidates } = dashboard;
   const last = state.candles[state.candles.length - 1];
+  setMarketMode(state.marketMode, { skipScroll: true });
+  updateCornerAuthUi();
+  updateOfferUi();
 
   els.chartTitle.textContent = `${state.ticker} Options Flow`;
   els.lastPrice.textContent = last ? `$${last.close.toFixed(2)}` : "$0.00";
@@ -1352,7 +1512,15 @@ function scheduleRefresh() {
 }
 
 els.applyTickerBtn.addEventListener("click", () => {
-  loadTicker(els.tickerInput.value);
+  handleUnifiedSearchSubmit();
+});
+
+els.marketModeButtons?.addEventListener("click", (event) => {
+  const button = event.target.closest(".market-mode-btn");
+  if (!button) {
+    return;
+  }
+  setMarketMode(button.dataset.market || "stock");
 });
 
 els.armTradeBtn.addEventListener("click", () => {
@@ -1454,13 +1622,44 @@ els.forexCandidatesNextBtn?.addEventListener("click", () => {
 
 els.tickerInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
-    loadTicker(els.tickerInput.value);
+    handleUnifiedSearchSubmit();
   }
+});
+
+els.cornerAuthToggle?.addEventListener("click", () => {
+  const open = els.cornerAuthPanel.hidden;
+  setCornerAuthOpen(open);
+});
+
+els.googleLoginBtn?.addEventListener("click", () => {
+  const email = (els.authEmailInput.value || "").trim() || "member@live-signals.ai";
+  state.auth = {
+    loggedIn: true,
+    email
+  };
+  saveAuthState();
+  updateCornerAuthUi();
+  setCornerAuthOpen(false);
+});
+
+els.logoutBtn?.addEventListener("click", () => {
+  state.auth = { loggedIn: false, email: "" };
+  saveAuthState();
+  updateCornerAuthUi();
+});
+
+[els.offerBaseInput, els.offerCustomInput].forEach((element) => {
+  element?.addEventListener("input", updateOfferUi);
 });
 
 window.addEventListener("resize", drawChart);
 
 syncTradeConfigFromInputs();
+buildUnifiedSearchOptions();
+updateCornerAuthUi();
+updateOfferUi();
+setCornerAuthOpen(false);
+setMarketMode(state.marketMode, { skipScroll: true });
 renderHistoryTable();
 drawChart();
 connectLiveSocket();
