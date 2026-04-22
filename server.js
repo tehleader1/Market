@@ -30,6 +30,8 @@ const FOREX_CANDIDATE_UNIVERSE = [
   "C:GBPJPY", "C:EURGBP", "C:AUDJPY", "C:CHFJPY", "C:EURAUD", "C:EURNZD", "C:GBPAUD", "C:GBPCAD",
   "C:XAUUSD", "C:USDNOK", "C:USDSEK", "C:USDMXN"
 ];
+const SCANNER_CACHE_MS = 45000;
+const SCANNER_BATCH_SIZE = 6;
 
 loadEnvFile();
 
@@ -48,6 +50,10 @@ let polygonConnected = false;
 let polygonSubscribed = new Set();
 let polygonStreamError = "";
 const liveProvider = alpacaKeyId && alpacaSecretKey ? "alpaca" : "polygon";
+const scannerBoardState = {
+  crypto: { results: [], updatedAt: 0, cursor: 0, promise: null },
+  forex: { results: [], updatedAt: 0, cursor: 0, promise: null }
+};
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -140,8 +146,8 @@ async function buildDashboardPayload(ticker) {
   const historicalContext = buildHistoricalContext(underlyingBars);
   const orderFlow = await fetchOrderFlow(recentTradesUrl, underlyingPrice);
   const topCandidatesPromise = buildTopCandidates(ticker).catch(() => []);
-  const cryptoCandidatesPromise = buildCryptoCandidates().catch(() => []);
-  const forexCandidatesPromise = buildForexCandidates().catch(() => []);
+  const cryptoCandidatesPromise = getScannerBoardCandidates("crypto").catch(() => []);
+  const forexCandidatesPromise = getScannerBoardCandidates("forex").catch(() => []);
   try {
     const [callChain, putChain] = await Promise.all([
       fetchJson(callChainUrl),
@@ -1280,11 +1286,11 @@ async function buildTopCandidates(activeTicker) {
   }];
 }
 
-async function buildCryptoCandidates() {
+async function buildCryptoCandidates(symbols = CRYPTO_CANDIDATE_UNIVERSE) {
   const now = new Date();
   const fromDate = shiftDate(now, -3);
   const toDate = formatDate(now);
-  const results = await Promise.all(CRYPTO_CANDIDATE_UNIVERSE.map(async (ticker) => {
+  const results = await Promise.all(symbols.map(async (ticker) => {
     try {
       const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/10/minute/${fromDate}/${toDate}`);
       url.searchParams.set("adjusted", "true");
@@ -1363,11 +1369,11 @@ async function buildCryptoCandidates() {
   return results.filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 24);
 }
 
-async function buildForexCandidates() {
+async function buildForexCandidates(symbols = FOREX_CANDIDATE_UNIVERSE) {
   const now = new Date();
   const fromDate = shiftDate(now, -5);
   const toDate = formatDate(now);
-  const results = await Promise.all(FOREX_CANDIDATE_UNIVERSE.map(async (ticker) => {
+  const results = await Promise.all(symbols.map(async (ticker) => {
     try {
       const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/10/minute/${fromDate}/${toDate}`);
       url.searchParams.set("adjusted", "true");
@@ -1450,6 +1456,79 @@ function buildForexButterflyExplanation(ticker, direction, pips, topBottomSignal
   const pair = ticker.replace("C:", "");
   const directionWord = direction === "bullish" ? "higher" : "lower";
   return `Global butterfly read: 1. cross-market positioning is pushing ${pair} ${directionWord}; 2. session handoff is feeding the spike; 3. macro repricing is supporting a ${topBottomSignal.breakoutBiasLabel}. ${topBottomSignal.timeframeLabel} blow-up read ${topBottomSignal.blowUpScore.toFixed(0)}% with ${pips.toFixed(0)} pips active.`;
+}
+
+async function getScannerBoardCandidates(kind) {
+  const board = scannerBoardState[kind];
+  if (!board) {
+    return [];
+  }
+
+  if (board.promise) {
+    return board.promise;
+  }
+
+  if (board.updatedAt && (Date.now() - board.updatedAt) < SCANNER_CACHE_MS && board.results.length) {
+    return board.results;
+  }
+
+  board.promise = refreshScannerBoard(kind)
+    .catch(() => board.results)
+    .finally(() => {
+      board.promise = null;
+    });
+
+  return board.promise;
+}
+
+async function refreshScannerBoard(kind) {
+  const board = scannerBoardState[kind];
+  const universe = kind === "crypto" ? CRYPTO_CANDIDATE_UNIVERSE : FOREX_CANDIDATE_UNIVERSE;
+  const builder = kind === "crypto" ? buildCryptoCandidates : buildForexCandidates;
+  const symbols = board.results.length
+    ? getScannerBatch(universe, board.cursor, SCANNER_BATCH_SIZE)
+    : universe;
+  const freshResults = await builder(symbols);
+  board.cursor = (board.cursor + (board.results.length ? SCANNER_BATCH_SIZE : universe.length)) % Math.max(1, universe.length);
+
+  if (freshResults.length) {
+    board.results = mergeScannerCandidates(board.results, freshResults);
+    board.updatedAt = Date.now();
+  } else if (!board.results.length) {
+    board.updatedAt = Date.now();
+  }
+
+  return board.results;
+}
+
+function getScannerBatch(universe, cursor, size) {
+  if (!universe.length) {
+    return [];
+  }
+
+  const batch = [];
+  for (let index = 0; index < Math.min(size, universe.length); index += 1) {
+    batch.push(universe[(cursor + index) % universe.length]);
+  }
+  return batch;
+}
+
+function mergeScannerCandidates(previous, incoming) {
+  const merged = new Map();
+  previous.forEach((item) => {
+    if (item?.ticker) {
+      merged.set(item.ticker, item);
+    }
+  });
+  incoming.forEach((item) => {
+    if (item?.ticker) {
+      merged.set(item.ticker, item);
+    }
+  });
+
+  return Array.from(merged.values())
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0))
+    .slice(0, 24);
 }
 
 function inferTimeframeMinutes(candles) {

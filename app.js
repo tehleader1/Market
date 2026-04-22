@@ -1249,6 +1249,8 @@ async function loadTicker(ticker) {
     state.dashboard = {
       candles: state.candles,
       topCandidates: state.dashboard?.topCandidates || [],
+      cryptoCandidates: state.dashboard?.cryptoCandidates || [],
+      forexCandidates: state.dashboard?.forexCandidates || [],
       metrics: state.dashboard?.metrics || {
         delta: 0,
         volumePercent: 0,
