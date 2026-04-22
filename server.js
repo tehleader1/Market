@@ -1348,12 +1348,22 @@ function buildTopBottomSignal({
   const manipulationCount = Object.values(manipulationIndicators).filter(Boolean).length;
   const breakoutCount = Object.values(breakoutIndicators).filter(Boolean).length;
   const unhookCount = Object.values(unhookIndicators).filter(Boolean).length;
+  const focusWindow = getFocusWindowState();
   const lockScore = clamp(
     manipulationCount * 18 +
     breakoutCount * 16 +
     historicalPressureBalance * 0.28 +
     whaleInflux * 0.18 -
-    unhookCount * 14,
+    unhookCount * 14 -
+    focusWindow.distancePenalty,
+    0,
+    100
+  );
+  const breakoutChance = clamp(
+    historicalPressureBalance +
+    breakoutCount * 6 -
+    unhookCount * 8 -
+    focusWindow.distancePenalty * 0.7,
     0,
     100
   );
@@ -1378,21 +1388,22 @@ function buildTopBottomSignal({
     breakoutCount,
     unhookCount,
     lockScore,
+    breakoutChance,
     pulseMs: lockScore >= 86 ? 420 : lockScore >= 72 ? 700 : lockScore >= 56 ? 1100 : 1800,
     laserDensity: lockScore >= 86 ? 6 : lockScore >= 72 ? 5 : lockScore >= 56 ? 4 : 3,
     state,
-    windowLabel: getFocusWindowLabel()
+    windowLabel: focusWindow.label,
+    minutesToWindow: focusWindow.minutesToWindow,
+    traderDriver: whaleInflux >= 26 ? "whales" : "normal_traders",
+    breakoutBiasLabel: direction === "bullish" ? "new higher high" : "new lower low"
   };
 }
 
 function isFocusWindowActive() {
-  const parts = getEasternParts();
-  const minute = parts.hour * 60 + parts.minute;
-  const windows = [9 * 60 + 30, 14 * 60];
-  return windows.some((anchor) => Math.abs(anchor - minute) <= 45);
+  return getFocusWindowState().isActive;
 }
 
-function getFocusWindowLabel() {
+function getFocusWindowState() {
   const parts = getEasternParts();
   const minute = parts.hour * 60 + parts.minute;
   const windows = [
@@ -1402,7 +1413,13 @@ function getFocusWindowLabel() {
   const closest = windows.reduce((best, item) => (
     Math.abs(item.minute - minute) < Math.abs(best.minute - minute) ? item : best
   ), windows[0]);
-  return closest.label;
+  const minutesToWindow = Math.abs(closest.minute - minute);
+  return {
+    label: closest.label,
+    minutesToWindow,
+    isActive: minutesToWindow <= 45,
+    distancePenalty: clamp((minutesToWindow - 20) * 0.9, 0, 26)
+  };
 }
 
 function getWickWindow(lastTimestamp) {

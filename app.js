@@ -813,13 +813,13 @@ function updateTopBottomReader(metrics, contract) {
     `${capitalize(signal.target || (metrics.direction === "bullish" ? "bottom" : "top"))} watch`,
     `Offset ${Number(signal.offset || 0).toFixed(2)}`,
     `Whales ${Number(signal.whaleInflux || 0).toFixed(0)}%`,
-    `Balance ${Number(signal.historicalPressureBalance || 0).toFixed(0)}%`,
+    `${capitalize(signal.breakoutBiasLabel || "breakout")} ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}%`,
     `Lock ${Number(signal.lockScore || 0).toFixed(0)}%`
   ]);
 
   if (isLocked) {
     els.topBottomReaderStatus.textContent = `${capitalize(signal.target || "turn")} locked`;
-    els.topBottomReaderText.textContent = `The pulse is locking faster because manipulation around this ${signal.target || "turn"} has already been absorbed. Offset from the prior turn is ${Number(signal.offset || 0).toFixed(2)}, whale influx is ${Number(signal.whaleInflux || 0).toFixed(0)}%, historical pressure balance is ${Number(signal.historicalPressureBalance || 0).toFixed(0)}%, and ${signal.breakoutCount || 0} breakout indicators are active into the ${signal.windowLabel || "focus window"}.`;
+    els.topBottomReaderText.textContent = `The pulse is locking faster because manipulation around this ${signal.target || "turn"} has already been absorbed. Offset from the prior turn is $${Number(signal.offset || 0).toFixed(2)}, whale influx is ${Number(signal.whaleInflux || 0).toFixed(0)}% so this is being driven by ${signal.traderDriver === "whales" ? "whales" : "normal traders"}, ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}% is the current read for a ${signal.breakoutBiasLabel || "breakout"}, and ${signal.breakoutCount || 0} breakout indicators are active toward the ${signal.windowLabel || "focus window"}. ${Number(signal.minutesToWindow || 0)} minutes from that wave means the setup can still be strong while momentum timing may not be ready yet.`;
     return;
   }
 
@@ -832,7 +832,7 @@ function updateTopBottomReader(metrics, contract) {
   els.topBottomReaderStatus.textContent = isBuilding
     ? `${capitalize(signal.target || "turn")} building`
     : "Scanning for a real turn";
-  els.topBottomReaderText.textContent = `The system is tracking a similar ${signal.target || "turn"} with an offset that is close but not identical. Manipulation indicators active: ${signal.manipulationCount || 0}/3, breakout indicators active: ${signal.breakoutCount || 0}/3, unhook indicators active: ${signal.unhookCount || 0}/3. The lasers speed up as the lock score rises so you can catch the real window before the 9:30 AM bell or 2:00 PM wave passes.`;
+  els.topBottomReaderText.textContent = `The system is tracking a similar ${signal.target || "turn"} with an offset that is close but not identical. Manipulation indicators active: ${signal.manipulationCount || 0}/3, breakout indicators active: ${signal.breakoutCount || 0}/3, unhook indicators active: ${signal.unhookCount || 0}/3. The current read for a ${signal.breakoutBiasLabel || "breakout"} is ${Number(signal.breakoutChance || signal.historicalPressureBalance || 0).toFixed(0)}%, and the move is ${Number(signal.minutesToWindow || 0)} minutes from the ${signal.windowLabel || "focus window"}, so the lock can build before the real momentum window is close enough.`;
 }
 
 function updateNeutralZoneReader(metrics, contract) {
