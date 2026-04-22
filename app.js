@@ -703,6 +703,7 @@ function renderCandidateBoard({ candidates, kind, emptyMessage, statusLabel }) {
       : item.marketType === "forex"
         ? `${Number(item.pipMove || 0).toFixed(0)} pips`
         : `$${Number(item.projectedProfit || 0).toLocaleString()} est.`;
+    const miniChart = buildMiniChartSvg(item.miniCandles || [], item.direction);
     return `
     <article class="candidate-item is-${item.direction}${stateClass}" style="--candidate-laser-speed:${item.topBottomState === "ignited" ? 360 : item.topBottomLockScore >= 80 ? 520 : item.topBottomLockScore >= 60 ? 900 : 1600}ms;">
       <div class="candidate-lasers" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
@@ -713,6 +714,7 @@ function renderCandidateBoard({ candidates, kind, emptyMessage, statusLabel }) {
         <p class="candidate-subtext">${item.contextNote || ""}</p>
       </div>
       <div class="candidate-meta">
+        <div class="candidate-chart">${miniChart}</div>
         <span>$${Number(item.lastPrice || 0).toFixed(2)}</span>
         <span>${Number(item.topBottomLockScore || 0).toFixed(0)}% lock</span>
         <span>${tertiary}</span>
@@ -720,6 +722,34 @@ function renderCandidateBoard({ candidates, kind, emptyMessage, statusLabel }) {
     </article>
   `;
   }).join("");
+}
+
+function buildMiniChartSvg(values, direction) {
+  if (!values.length) {
+    return `<div class="candidate-chart-empty">No chart</div>`;
+  }
+
+  const width = 170;
+  const height = 56;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(0.00001, max - min);
+  const points = values.map((value, index) => {
+    const x = (index / Math.max(1, values.length - 1)) * (width - 8) + 4;
+    const y = height - (((value - min) / range) * (height - 12) + 6);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const stroke = direction === "bearish" ? "#ff8c8c" : "#8fffc0";
+  const fill = direction === "bearish"
+    ? "rgba(255,122,122,0.12)"
+    : "rgba(97,244,166,0.12)";
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
+      <polyline class="candidate-chart-shadow" points="${points}" />
+      <polyline class="candidate-chart-line" points="${points}" style="--chart-stroke:${stroke}; --chart-fill:${fill};" />
+    </svg>
+  `;
 }
 
 function renderFlowSteps(metrics, contract) {

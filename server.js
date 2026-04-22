@@ -1231,6 +1231,7 @@ async function buildTopCandidates(activeTicker) {
         floor: historicalContext.floor,
         breakoutBias: historicalContext.breakoutBias,
         sessionLabel: buildVolumeForecast(candles).label,
+        miniCandles: candles.slice(-16).map((candle) => candle.close),
         score
       };
     } catch (error) {
@@ -1266,6 +1267,7 @@ async function buildTopCandidates(activeTicker) {
     floor: 0,
     breakoutBias: 0,
     sessionLabel: "Fallback board item",
+    miniCandles: [],
     score: 0
   }];
 }
@@ -1338,6 +1340,7 @@ async function buildCryptoCandidates() {
         projectedProfit: Math.round(400 * (projectedMove / Math.max(0.0001, last.close * 0.015))),
         threeDayPattern: `${historicalContext.threeDayLabel} • 24/7 crypto`,
         contextNote: `24/7 crypto read. Decimal turn offset ${decimalOffset} with all-day enthusiasm watching for a ${topBottomSignal.breakoutBiasLabel}.`,
+        miniCandles: candles.slice(-16).map((candle) => candle.close),
         score
       };
     } catch (error) {
@@ -1416,6 +1419,7 @@ async function buildForexCandidates() {
         projectedProfit: Math.round(pips * 8),
         threeDayPattern: `${historicalContext.threeDayLabel} • forex spike`,
         contextNote: buildForexButterflyExplanation(ticker, direction, pips, topBottomSignal),
+        miniCandles: candles.slice(-16).map((candle) => candle.close),
         score
       };
     } catch (error) {
