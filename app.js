@@ -71,7 +71,9 @@ const state = {
     activeUntil: 0,
     breathing: false
   },
-  topCandidatesPage: 0
+  topCandidatesPage: 0,
+  cryptoCandidatesPage: 0,
+  forexCandidatesPage: 0
 };
 
 const els = {
@@ -153,6 +155,16 @@ const els = {
   topCandidatesPrevBtn: document.getElementById("topCandidatesPrevBtn"),
   topCandidatesNextBtn: document.getElementById("topCandidatesNextBtn"),
   topCandidatesPage: document.getElementById("topCandidatesPage"),
+  cryptoCandidatesStatus: document.getElementById("cryptoCandidatesStatus"),
+  cryptoCandidates: document.getElementById("cryptoCandidates"),
+  cryptoCandidatesPrevBtn: document.getElementById("cryptoCandidatesPrevBtn"),
+  cryptoCandidatesNextBtn: document.getElementById("cryptoCandidatesNextBtn"),
+  cryptoCandidatesPage: document.getElementById("cryptoCandidatesPage"),
+  forexCandidatesStatus: document.getElementById("forexCandidatesStatus"),
+  forexCandidates: document.getElementById("forexCandidates"),
+  forexCandidatesPrevBtn: document.getElementById("forexCandidatesPrevBtn"),
+  forexCandidatesNextBtn: document.getElementById("forexCandidatesNextBtn"),
+  forexCandidatesPage: document.getElementById("forexCandidatesPage"),
   historyStatus: document.getElementById("historyStatus"),
   historyTableBody: document.getElementById("historyTableBody")
 };
@@ -524,7 +536,7 @@ function updateUi() {
     return;
   }
 
-  const { metrics, contract, marketStatus, error, orderFlow, topCandidates } = dashboard;
+  const { metrics, contract, marketStatus, error, orderFlow, topCandidates, cryptoCandidates, forexCandidates } = dashboard;
   const last = state.candles[state.candles.length - 1];
 
   els.chartTitle.textContent = `${state.ticker} Options Flow`;
@@ -552,7 +564,24 @@ function updateUi() {
   els.pressureHint.textContent = metrics.pressureHint;
   renderOrderFlow(orderFlow);
   updateDeployPanel();
-  renderTopCandidates(topCandidates || []);
+  renderCandidateBoard({
+    candidates: topCandidates || [],
+    kind: "topCandidates",
+    emptyMessage: "Waiting for top candidates.",
+    statusLabel: "names ranked for top / bottom lock"
+  });
+  renderCandidateBoard({
+    candidates: cryptoCandidates || [],
+    kind: "cryptoCandidates",
+    emptyMessage: "Waiting for crypto candidates.",
+    statusLabel: "crypto names ranked for all-day turns"
+  });
+  renderCandidateBoard({
+    candidates: forexCandidates || [],
+    kind: "forexCandidates",
+    emptyMessage: "Waiting for forex candidates.",
+    statusLabel: "forex pairs ranked for pip spikes"
+  });
 
   els.centerIndicator.classList.toggle("is-on", metrics.continuationReady);
   els.centerIndicator.classList.toggle("is-off", !metrics.continuationReady);
@@ -631,29 +660,36 @@ function updateDeployPanel() {
     : "This board is ready to deploy to a permanent Node host like Render. Once deployed, this panel will show the hosted link instead of the local `127.0.0.1` address.";
 }
 
-function renderTopCandidates(candidates) {
-  els.topCandidatesStatus.textContent = candidates.length
-    ? `${candidates.length} names ranked for top / bottom lock`
-    : "Scanning near $55 zone";
+function renderCandidateBoard({ candidates, kind, emptyMessage, statusLabel }) {
+  const statusEl = els[`${kind}Status`];
+  const pageEl = els[`${kind}Page`];
+  const prevBtn = els[`${kind}PrevBtn`];
+  const nextBtn = els[`${kind}NextBtn`];
+  const listEl = els[kind];
+  const stateKey = `${kind}Page`;
+
+  statusEl.textContent = candidates.length
+    ? `${candidates.length} ${statusLabel}`
+    : emptyMessage.replace("Waiting for ", "").replace(".", "");
 
   if (!candidates.length) {
-    els.topCandidatesPage.textContent = "Page 1 of 1";
-    els.topCandidatesPrevBtn.disabled = true;
-    els.topCandidatesNextBtn.disabled = true;
-    els.topCandidates.innerHTML = `<p class="order-flow-empty">Waiting for top candidates.</p>`;
+    pageEl.textContent = "Page 1 of 1";
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    listEl.innerHTML = `<p class="order-flow-empty">${emptyMessage}</p>`;
     return;
   }
 
   const pageCount = Math.max(1, Math.ceil(candidates.length / TOP_CANDIDATES_PAGE_SIZE));
-  state.topCandidatesPage = Math.max(0, Math.min(state.topCandidatesPage, pageCount - 1));
-  const start = state.topCandidatesPage * TOP_CANDIDATES_PAGE_SIZE;
+  state[stateKey] = Math.max(0, Math.min(state[stateKey], pageCount - 1));
+  const start = state[stateKey] * TOP_CANDIDATES_PAGE_SIZE;
   const visible = candidates.slice(start, start + TOP_CANDIDATES_PAGE_SIZE);
 
-  els.topCandidatesPage.textContent = `Page ${state.topCandidatesPage + 1} of ${pageCount}`;
-  els.topCandidatesPrevBtn.disabled = state.topCandidatesPage === 0;
-  els.topCandidatesNextBtn.disabled = state.topCandidatesPage >= pageCount - 1;
+  pageEl.textContent = `Page ${state[stateKey] + 1} of ${pageCount}`;
+  prevBtn.disabled = state[stateKey] === 0;
+  nextBtn.disabled = state[stateKey] >= pageCount - 1;
 
-  els.topCandidates.innerHTML = visible.map((item, index) => {
+  listEl.innerHTML = visible.map((item, index) => {
     const stateClass = item.topBottomState === "ignited"
       ? " is-breathing is-dark-green"
       : item.topBottomState === "locked"
@@ -662,6 +698,11 @@ function renderTopCandidates(candidates) {
           ? " is-soft-green"
           : "";
     const driverLabel = item.topBottomTraderDriver === "whales" ? "whales" : "normal traders";
+    const tertiary = item.marketType === "crypto"
+      ? `${item.decimalOffset || "0.00000"} turn offset`
+      : item.marketType === "forex"
+        ? `${Number(item.pipMove || 0).toFixed(0)} pips`
+        : `$${Number(item.projectedProfit || 0).toLocaleString()} est.`;
     return `
     <article class="candidate-item is-${item.direction}${stateClass}" style="--candidate-laser-speed:${item.topBottomState === "ignited" ? 360 : item.topBottomLockScore >= 80 ? 520 : item.topBottomLockScore >= 60 ? 900 : 1600}ms;">
       <div class="candidate-lasers" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
@@ -669,11 +710,12 @@ function renderTopCandidates(candidates) {
         <strong>#${start + index + 1} ${item.ticker}</strong>
         <p>${capitalize(item.direction)} • approaching ${item.topBottomTarget || "turn"} • ${item.threeDayPattern}</p>
         <p class="candidate-subtext">${capitalize(item.topBottomBreakoutBiasLabel || "breakout")} ${Number(item.topBottomBreakoutChance || 0).toFixed(0)}% • ${driverLabel}</p>
+        <p class="candidate-subtext">${item.contextNote || ""}</p>
       </div>
       <div class="candidate-meta">
         <span>$${Number(item.lastPrice || 0).toFixed(2)}</span>
         <span>${Number(item.topBottomLockScore || 0).toFixed(0)}% lock</span>
-        <span>$${Number(item.projectedProfit || 0).toLocaleString()} est.</span>
+        <span>${tertiary}</span>
       </div>
     </article>
   `;
@@ -1285,14 +1327,68 @@ els.armTradeBtn.addEventListener("click", () => {
 
 els.topCandidatesPrevBtn?.addEventListener("click", () => {
   state.topCandidatesPage = Math.max(0, state.topCandidatesPage - 1);
-  renderTopCandidates(state.dashboard?.topCandidates || []);
+  renderCandidateBoard({
+    candidates: state.dashboard?.topCandidates || [],
+    kind: "topCandidates",
+    emptyMessage: "Waiting for top candidates.",
+    statusLabel: "names ranked for top / bottom lock"
+  });
 });
 
 els.topCandidatesNextBtn?.addEventListener("click", () => {
   const total = state.dashboard?.topCandidates?.length || 0;
   const pageCount = Math.max(1, Math.ceil(total / TOP_CANDIDATES_PAGE_SIZE));
   state.topCandidatesPage = Math.min(pageCount - 1, state.topCandidatesPage + 1);
-  renderTopCandidates(state.dashboard?.topCandidates || []);
+  renderCandidateBoard({
+    candidates: state.dashboard?.topCandidates || [],
+    kind: "topCandidates",
+    emptyMessage: "Waiting for top candidates.",
+    statusLabel: "names ranked for top / bottom lock"
+  });
+});
+
+els.cryptoCandidatesPrevBtn?.addEventListener("click", () => {
+  state.cryptoCandidatesPage = Math.max(0, state.cryptoCandidatesPage - 1);
+  renderCandidateBoard({
+    candidates: state.dashboard?.cryptoCandidates || [],
+    kind: "cryptoCandidates",
+    emptyMessage: "Waiting for crypto candidates.",
+    statusLabel: "crypto names ranked for all-day turns"
+  });
+});
+
+els.cryptoCandidatesNextBtn?.addEventListener("click", () => {
+  const total = state.dashboard?.cryptoCandidates?.length || 0;
+  const pageCount = Math.max(1, Math.ceil(total / TOP_CANDIDATES_PAGE_SIZE));
+  state.cryptoCandidatesPage = Math.min(pageCount - 1, state.cryptoCandidatesPage + 1);
+  renderCandidateBoard({
+    candidates: state.dashboard?.cryptoCandidates || [],
+    kind: "cryptoCandidates",
+    emptyMessage: "Waiting for crypto candidates.",
+    statusLabel: "crypto names ranked for all-day turns"
+  });
+});
+
+els.forexCandidatesPrevBtn?.addEventListener("click", () => {
+  state.forexCandidatesPage = Math.max(0, state.forexCandidatesPage - 1);
+  renderCandidateBoard({
+    candidates: state.dashboard?.forexCandidates || [],
+    kind: "forexCandidates",
+    emptyMessage: "Waiting for forex candidates.",
+    statusLabel: "forex pairs ranked for pip spikes"
+  });
+});
+
+els.forexCandidatesNextBtn?.addEventListener("click", () => {
+  const total = state.dashboard?.forexCandidates?.length || 0;
+  const pageCount = Math.max(1, Math.ceil(total / TOP_CANDIDATES_PAGE_SIZE));
+  state.forexCandidatesPage = Math.min(pageCount - 1, state.forexCandidatesPage + 1);
+  renderCandidateBoard({
+    candidates: state.dashboard?.forexCandidates || [],
+    kind: "forexCandidates",
+    emptyMessage: "Waiting for forex candidates.",
+    statusLabel: "forex pairs ranked for pip spikes"
+  });
 });
 
 [

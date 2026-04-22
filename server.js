@@ -20,6 +20,16 @@ const TOP_CANDIDATE_UNIVERSE = [
   "ASTS", "TLRY", "AAL", "CCL", "DAL", "PFE", "BBAI", "SOUN", "CRSR", "RIVN",
   "AMD", "INTC", "NVDA", "AAPL", "TSLA", "QQQ", "IWM", "SPY", "SMCI", "COIN"
 ];
+const CRYPTO_CANDIDATE_UNIVERSE = [
+  "X:BTCUSD", "X:ETHUSD", "X:SOLUSD", "X:XRPUSD", "X:ADAUSD", "X:DOGEUSD", "X:AVAXUSD", "X:LINKUSD",
+  "X:LTCUSD", "X:BCHUSD", "X:DOTUSD", "X:MATICUSD", "X:ATOMUSD", "X:UNIUSD", "X:NEARUSD", "X:APTUSD",
+  "X:HBARUSD", "X:TRXUSD", "X:SHIBUSD", "X:PEPEUSD"
+];
+const FOREX_CANDIDATE_UNIVERSE = [
+  "C:EURUSD", "C:GBPUSD", "C:USDJPY", "C:AUDUSD", "C:USDCAD", "C:USDCHF", "C:NZDUSD", "C:EURJPY",
+  "C:GBPJPY", "C:EURGBP", "C:AUDJPY", "C:CHFJPY", "C:EURAUD", "C:EURNZD", "C:GBPAUD", "C:GBPCAD",
+  "C:XAUUSD", "C:USDNOK", "C:USDSEK", "C:USDMXN"
+];
 
 loadEnvFile();
 
@@ -130,6 +140,8 @@ async function buildDashboardPayload(ticker) {
   const historicalContext = buildHistoricalContext(underlyingBars);
   const orderFlow = await fetchOrderFlow(recentTradesUrl, underlyingPrice);
   const topCandidatesPromise = buildTopCandidates(ticker).catch(() => []);
+  const cryptoCandidatesPromise = buildCryptoCandidates().catch(() => []);
+  const forexCandidatesPromise = buildForexCandidates().catch(() => []);
   try {
     const [callChain, putChain] = await Promise.all([
       fetchJson(callChainUrl),
@@ -150,7 +162,11 @@ async function buildDashboardPayload(ticker) {
 
     const metrics = deriveMetrics(chartCandles, selected, underlyingPrice, historicalContext);
     const marketStatus = buildMarketStatus(optionAggs, candles.length, chartCandles === underlyingBars, ticker);
-    const topCandidates = await topCandidatesPromise;
+    const [topCandidates, cryptoCandidates, forexCandidates] = await Promise.all([
+      topCandidatesPromise,
+      cryptoCandidatesPromise,
+      forexCandidatesPromise
+    ]);
 
     return {
       ticker,
@@ -158,6 +174,8 @@ async function buildDashboardPayload(ticker) {
       candles: chartCandles,
       orderFlow,
       topCandidates,
+      cryptoCandidates,
+      forexCandidates,
       marketStatus,
       error: candles.length >= 6 ? "" : `Using ${ticker} underlying bars because the option contract returned limited candle history.`,
       metrics
@@ -167,12 +185,20 @@ async function buildDashboardPayload(ticker) {
       throw error;
     }
 
+    const [topCandidates, cryptoCandidates, forexCandidates] = await Promise.all([
+      topCandidatesPromise,
+      cryptoCandidatesPromise,
+      forexCandidatesPromise
+    ]);
+
     return {
       ticker,
       contract: null,
       candles: underlyingBars,
       orderFlow,
-      topCandidates: await topCandidatesPromise,
+      topCandidates,
+      cryptoCandidates,
+      forexCandidates,
       marketStatus: `${ticker} stock candles loaded`,
       error: "Your Polygon key is not entitled to options snapshot/greeks data on the current plan. The dashboard is using stock candles only until the plan is upgraded or a different options provider is connected.",
       metrics: deriveFallbackMetrics(underlyingBars, historicalContext)
@@ -1242,6 +1268,168 @@ async function buildTopCandidates(activeTicker) {
     sessionLabel: "Fallback board item",
     score: 0
   }];
+}
+
+async function buildCryptoCandidates() {
+  const now = new Date();
+  const fromDate = shiftDate(now, -3);
+  const toDate = formatDate(now);
+  const results = await Promise.all(CRYPTO_CANDIDATE_UNIVERSE.map(async (ticker) => {
+    try {
+      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/30/minute/${fromDate}/${toDate}`);
+      url.searchParams.set("adjusted", "true");
+      url.searchParams.set("sort", "asc");
+      url.searchParams.set("limit", "160");
+      url.searchParams.set("apiKey", apiKey);
+      const payload = await fetchJson(url);
+      const candles = (payload.results || []).map(mapAggregate);
+      if (candles.length < 8) {
+        return null;
+      }
+      const historicalContext = buildHistoricalContext(candles);
+      const last = candles[candles.length - 1];
+      const recent = candles.slice(-Math.min(8, candles.length));
+      const avgVolume = average(candles.slice(-Math.min(16, candles.length)).map((candle) => candle.volume || 0)) || 1;
+      const trendSlope = recent.reduce((sum, candle) => sum + (candle.close - candle.open), 0);
+      const direction = historicalContext.threeDayDirection || (trendSlope >= 0 ? "bullish" : "bearish");
+      const volumeRatio = (last.volume || avgVolume) / avgVolume;
+      const deltaProxy = clamp(trendSlope / Math.max(0.00001, last.close * 0.025), -1, 1);
+      const pressure = clamp(
+        Math.abs(deltaProxy) * 38 +
+        Math.min(3, volumeRatio) * 20 +
+        historicalContext.biasStrength * 26 +
+        historicalContext.breakoutBias * 18 +
+        historicalContext.recentPushPercent * 0.24,
+        0,
+        100
+      );
+      const sessionFlow = buildSessionFlow(candles, direction, historicalContext);
+      const topBottomSignal = buildTopBottomSignal({
+        candles,
+        direction,
+        pressure,
+        delta: deltaProxy,
+        volumeRatio,
+        wickSupportsDirection: direction === "bullish" ? last.close >= last.open : last.close <= last.open,
+        wickSizeQualified: true,
+        historicalContext,
+        sessionFlow,
+        contractVolume: 0,
+        quoteDepth: 0,
+        openInterest: 0
+      });
+      const decimalOffset = Number(topBottomSignal.offset || 0).toFixed(last.close < 10 ? 5 : 2);
+      const projectedMove = Math.max(0, historicalContext.volatility * (topBottomSignal.breakoutChance / 100) * 1.3);
+      const score = topBottomSignal.lockScore * 0.6 + topBottomSignal.breakoutChance * 0.3 + pressure * 0.1;
+      return {
+        ticker: ticker.replace("X:", ""),
+        marketType: "crypto",
+        lastPrice: last.close,
+        direction,
+        topBottomTarget: topBottomSignal.target,
+        topBottomState: topBottomSignal.state,
+        topBottomLockScore: topBottomSignal.lockScore,
+        topBottomBreakoutChance: topBottomSignal.breakoutChance,
+        topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
+        topBottomTraderDriver: "global traders",
+        decimalOffset,
+        projectedMove,
+        pressure: Math.round(pressure),
+        projectedProfit: Math.round(400 * (projectedMove / Math.max(0.0001, last.close * 0.015))),
+        threeDayPattern: `${historicalContext.threeDayLabel} • 24/7 crypto`,
+        contextNote: `24/7 crypto read. Decimal turn offset ${decimalOffset} with all-day enthusiasm watching for a ${topBottomSignal.breakoutBiasLabel}.`,
+        score
+      };
+    } catch (error) {
+      return null;
+    }
+  }));
+
+  return results.filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 24);
+}
+
+async function buildForexCandidates() {
+  const now = new Date();
+  const fromDate = shiftDate(now, -5);
+  const toDate = formatDate(now);
+  const results = await Promise.all(FOREX_CANDIDATE_UNIVERSE.map(async (ticker) => {
+    try {
+      const url = new URL(`https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/30/minute/${fromDate}/${toDate}`);
+      url.searchParams.set("adjusted", "true");
+      url.searchParams.set("sort", "asc");
+      url.searchParams.set("limit", "160");
+      url.searchParams.set("apiKey", apiKey);
+      const payload = await fetchJson(url);
+      const candles = (payload.results || []).map(mapAggregate);
+      if (candles.length < 8) {
+        return null;
+      }
+      const historicalContext = buildHistoricalContext(candles);
+      const last = candles[candles.length - 1];
+      const recent = candles.slice(-Math.min(8, candles.length));
+      const avgVolume = average(candles.slice(-Math.min(16, candles.length)).map((candle) => candle.volume || 0)) || 1;
+      const trendSlope = recent.reduce((sum, candle) => sum + (candle.close - candle.open), 0);
+      const direction = historicalContext.threeDayDirection || (trendSlope >= 0 ? "bullish" : "bearish");
+      const volumeRatio = (last.volume || avgVolume) / avgVolume;
+      const deltaProxy = clamp(trendSlope / Math.max(0.00001, last.close * 0.01), -1, 1);
+      const pressure = clamp(
+        Math.abs(deltaProxy) * 34 +
+        Math.min(2.5, volumeRatio) * 18 +
+        historicalContext.biasStrength * 24 +
+        historicalContext.breakoutBias * 20 +
+        historicalContext.recentPushPercent * 0.28,
+        0,
+        100
+      );
+      const sessionFlow = buildSessionFlow(candles, direction, historicalContext);
+      const topBottomSignal = buildTopBottomSignal({
+        candles,
+        direction,
+        pressure,
+        delta: deltaProxy,
+        volumeRatio,
+        wickSupportsDirection: direction === "bullish" ? last.close >= last.open : last.close <= last.open,
+        wickSizeQualified: true,
+        historicalContext,
+        sessionFlow,
+        contractVolume: 0,
+        quoteDepth: 0,
+        openInterest: 0
+      });
+      const pipMultiplier = last.close >= 20 ? 100 : 10000;
+      const pips = Math.abs(last.close - recent[0].close) * pipMultiplier;
+      const score = topBottomSignal.lockScore * 0.52 + topBottomSignal.breakoutChance * 0.26 + Math.min(80, pips) * 0.22;
+      return {
+        ticker: ticker.replace("C:", ""),
+        marketType: "forex",
+        lastPrice: last.close,
+        direction,
+        topBottomTarget: topBottomSignal.target,
+        topBottomState: topBottomSignal.state,
+        topBottomLockScore: topBottomSignal.lockScore,
+        topBottomBreakoutChance: topBottomSignal.breakoutChance,
+        topBottomBreakoutBiasLabel: topBottomSignal.breakoutBiasLabel,
+        topBottomTraderDriver: "global traders",
+        pipMove: pips,
+        projectedMove: historicalContext.volatility,
+        pressure: Math.round(pressure),
+        projectedProfit: Math.round(pips * 8),
+        threeDayPattern: `${historicalContext.threeDayLabel} • forex spike`,
+        contextNote: buildForexButterflyExplanation(ticker, direction, pips, topBottomSignal),
+        score
+      };
+    } catch (error) {
+      return null;
+    }
+  }));
+
+  return results.filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 24);
+}
+
+function buildForexButterflyExplanation(ticker, direction, pips, topBottomSignal) {
+  const pair = ticker.replace("C:", "");
+  const directionWord = direction === "bullish" ? "higher" : "lower";
+  return `Global butterfly read: 1. cross-market positioning is pushing ${pair} ${directionWord}; 2. session handoff is feeding the spike; 3. macro repricing is supporting a ${topBottomSignal.breakoutBiasLabel}. Current spike read ${pips.toFixed(0)} pips.`;
 }
 
 function buildHistoricalContext(candles) {
