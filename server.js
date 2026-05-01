@@ -1987,7 +1987,8 @@ function serveStatic(requestPath, res) {
 
     const extension = path.extname(filePath).toLowerCase();
     res.writeHead(200, {
-      "Content-Type": MIME_TYPES[extension] || "application/octet-stream"
+      "Content-Type": MIME_TYPES[extension] || "application/octet-stream",
+      "Cache-Control": "no-store"
     });
     res.end(contents);
   });
