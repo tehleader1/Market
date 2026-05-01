@@ -3,45 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Anthony Figueroa Market</title>
+  <title>LasersMarket</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div class="corner-auth" id="cornerAuth">
-    <button class="corner-auth-toggle" id="cornerAuthToggle" type="button" aria-expanded="false">Member Login</button>
-    <div class="corner-auth-panel" id="cornerAuthPanel" hidden>
-      <p class="eyebrow">Special Access</p>
-      <strong id="authStatus">Logged out</strong>
-      <p id="authText" class="corner-auth-text">Compact login for premium members without blocking the readers.</p>
-      <label class="trade-field corner-auth-field">
-        <span>Email</span>
-        <input id="authEmailInput" type="email" placeholder="name@email.com" />
-      </label>
-      <div class="corner-auth-actions">
-        <button id="googleLoginBtn" class="corner-auth-google" type="button">Continue with Google</button>
-        <button id="logoutBtn" class="corner-auth-logout" type="button">Logout</button>
-      </div>
-    </div>
-  </div>
-
   <main class="dashboard">
-    <!-- GLOBAL TRACKER INSERTED HERE -->
-
     <section class="panel ticker-panel">
       <div class="panel-header">
         <p class="eyebrow">Stock Option Signal Reader</p>
         <h1>Live Candle Pressure Board</h1>
       </div>
-
-      <!-- rest unchanged -->
-
     </section>
   </main>
-
-  <script src="./market-global-tracker.js"></script>
-  <script src="./app.js"></script>
+  <script src="./market-global-tracker.js?v=clean2"></script>
+  <script src="./market-layout-fix.js?v=clean2"></script>
+  <script src="./app.js?v=clean2"></script>
 </body>
 </html>
