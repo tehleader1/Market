@@ -1,27 +1,48 @@
 (function(){
   const KEY='lmAuthV1';
+  const MARKET_URL='https://shop.supportrd.com/products/supportrd-market-signals';
+  const OWNER_GOOGLE_EMAIL='zzzanthony123@gmail.com';
+  const OWNER_PHONE='7044533983';
   function save(data){localStorage.setItem(KEY,JSON.stringify(data))}
+  function read(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return {}}}
+  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function phone(v){return String(v||'').replace(/[^0-9]/g,'')}
+  function isPaid(data){const plan=String(data?.plan||data?.tier||'');if(plan&&!/signals|25000/i.test(plan))return false;return /signals|25000/i.test(plan)||localStorage.getItem('lmMarketSignalsPaid')==='true'}
+  function ownerGoogle(email){return String(email||'').trim().toLowerCase()===OWNER_GOOGLE_EMAIL}
+  function ownerPhone(ph){return phone(ph)===OWNER_PHONE}
+  function displayName(auth){const email=String(auth?.email||'').trim();if(email)return email.split('@')[0]||'Member';const ph=phone(auth?.phone);return ph?`Phone ${ph.slice(-4)}`:'Free Member'}
+  function shouldMount(){const a=read();return !a.verified||!isPaid(a)}
   function css(){if(document.querySelector('#lmLoginCss'))return;const s=document.createElement('style');s.id='lmLoginCss';s.textContent=`
-  .lm-auth{position:fixed;inset:0;background:#050b16;display:flex;align-items:center;justify-content:center;z-index:99999;color:#fff;font-family:Space Grotesk}
-  .lm-auth-box{width:420px;background:#0b1324;border-radius:18px;padding:1.4rem;border:1px solid rgba(255,255,255,.12)}
-  .lm-auth h2{margin:.2rem 0}.lm-plan{border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:.7rem;margin:.4rem 0;cursor:pointer}
-  .lm-plan.active{border-color:#61f4a6;background:rgba(97,244,166,.08)}
-  .lm-auth input{width:100%;margin:.3rem 0;padding:.6rem;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:#000;color:#fff}
-  .lm-auth button{width:100%;margin-top:.6rem;padding:.7rem;border-radius:12px;background:#61f4a6;border:0;font-weight:900}
+  .lm-auth{position:fixed;right:0;top:64px;z-index:99999;width:min(260px,calc(100vw - 92px));max-height:calc(100dvh - 76px);overflow:auto;color:#fff;font-family:Inter,Space Grotesk,system-ui,sans-serif}
+  .lm-auth-box{background:linear-gradient(180deg,rgba(10,18,30,.86),rgba(4,9,18,.82));backdrop-filter:blur(20px);border:1px solid rgba(148,163,184,.3);border-right:0;border-radius:8px 0 0 8px;padding:8px;box-shadow:0 10px 28px rgba(0,0,0,.24)}
+  .lm-auth-head{display:grid;grid-template-columns:30px 1fr;gap:7px;align-items:center;margin-bottom:7px}.lm-auth-mark{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(135deg,#61f4a6,#ffc542);color:#06101f;font-weight:1000;font-size:.72rem}.lm-auth h2{margin:0;font-size:.82rem;line-height:1.1}.lm-auth p{margin:2px 0 0;color:#9fb0c4;font-size:.6rem;line-height:1.2}
+  .lm-plan-grid{display:grid;gap:5px;margin:6px 0}.lm-plan{position:relative;display:grid;grid-template-columns:10px 1fr auto;gap:6px;align-items:center;border:1px solid rgba(148,163,184,.22);border-radius:8px;padding:6px;background:rgba(255,255,255,.04);cursor:pointer;min-height:42px}.lm-plan:before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid rgba(148,163,184,.55)}.lm-plan strong{font-size:.68rem}.lm-plan small{display:block;margin-top:1px;color:#93a6ba;font-size:.55rem;line-height:1.1}.lm-plan b{justify-self:end;border:1px solid rgba(148,163,184,.2);border-radius:999px;padding:2px 5px;color:#d5e3ef;font-size:.52rem}.lm-plan.active{border-color:#61f4a6;background:rgba(97,244,166,.09);box-shadow:0 0 0 1px rgba(97,244,166,.2)}.lm-plan.active:before{border-color:#61f4a6;background:#61f4a6;box-shadow:inset 0 0 0 2px #07101f}
+  .lm-auth input{width:100%;height:32px;margin:0 0 5px;padding:0 8px;border-radius:8px;border:1px solid rgba(148,163,184,.24);background:rgba(0,0,0,.34);color:#fff;font-size:.74rem;outline:0}.lm-auth input:focus{border-color:rgba(97,244,166,.8);box-shadow:0 0 0 2px rgba(97,244,166,.14)}
+  .lm-auth button{width:100%;min-height:34px;margin-top:2px;padding:0 8px;border-radius:8px;background:#61f4a6;color:#06101f;border:0;font-weight:1000;font-size:.72rem;cursor:pointer}.lm-google{margin-bottom:5px!important;background:#f8fafc!important;color:#07101f!important}.lm-returning{margin-top:5px!important;background:rgba(255,255,255,.04)!important;color:#f7fbff!important;border:1px solid rgba(255,197,66,.35)!important}.lm-buy-link{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:5px;min-height:32px;border:1px solid rgba(255,197,66,.38);border-radius:8px;background:rgba(255,197,66,.1);color:#ffe7a3;text-decoration:none;padding:5px 7px;font-size:.62rem;font-weight:1000}.lm-auth-note,.lm-auth-status{margin-top:6px;border:1px solid rgba(148,163,184,.18);border-radius:8px;background:rgba(255,255,255,.035);padding:6px;color:#b7c7d8;font-size:.58rem;line-height:1.25}.lm-auth-status{display:none;color:#ffe7a3;border-color:rgba(255,197,66,.28);background:rgba(255,197,66,.08)}.lm-account-pop{position:fixed;right:0;top:64px;z-index:99998;width:min(238px,calc(100vw - 100px));border:1px solid rgba(148,163,184,.3);border-right:0;border-radius:8px 0 0 8px;background:linear-gradient(180deg,rgba(10,18,30,.86),rgba(4,9,18,.82));backdrop-filter:blur(20px);box-shadow:0 10px 28px rgba(0,0,0,.24);padding:8px;color:#fff}.lm-account-pop strong{display:block;font-size:.78rem}.lm-account-pop span{display:block;color:#9fb0c4;font-size:.6rem;margin-top:2px}.lm-account-pop .lm-feature{display:flex;justify-content:space-between;gap:6px;margin-top:5px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.04);padding:6px;font-size:.58rem}.lm-account-pop button{width:100%;margin-top:5px;min-height:30px;border:1px solid rgba(148,163,184,.2);border-radius:8px;background:rgba(255,255,255,.05);color:#fff;font-weight:900;font-size:.66rem}
+  @media(max-width:390px){.lm-auth{top:54px;width:min(238px,calc(100vw - 104px));max-height:calc(100dvh - 64px)}.lm-account-pop{top:54px;width:min(220px,calc(100vw - 116px))}}
   `;document.head.appendChild(s)}
   function ui(){
+    const saved=read();
     return `<div class="lm-auth" id="lmAuth">
       <div class="lm-auth-box">
-        <h2>LasersMarket Access</h2>
-        <p>Select your plan</p>
-        <div class="lm-plan" data-plan="free">Free<br><small>View limited scanners</small></div>
-        <div class="lm-plan" data-plan="premium">Premium / Pro<br><small>Full signals + live scanners</small></div>
-        <div class="lm-plan" data-plan="studio">+ Studio Jake<br><small>Advanced AI trading + audio tools</small></div>
-        <input placeholder="Email" id="lmEmail">
-        <input placeholder="Phone" id="lmPhone">
-        <button id="lmSubmit">Continue</button>
+        <div class="lm-auth-head"><div class="lm-auth-mark">LM</div><div><h2>LasersMarket Access</h2><p>Slim account routing for scanners and signals.</p></div></div>
+        <div class="lm-plan-grid">
+          <div class="lm-plan active" data-plan="free"><span><strong>Free account</strong><small>Remembers recent stock and crypto searches</small></span><b>Free</b></div>
+          <div class="lm-plan" data-plan="signals25000"><span><strong>$25,000 Market Signals</strong><small>Unlock actual crypto and stock reading scores</small></span><b>VIP</b></div>
+        </div>
+        <button class="lm-google" id="lmGoogleLogin" type="button">Continue with Google</button>
+        <input placeholder="Email" id="lmEmail" value="${esc(saved.email||'')}">
+        <input placeholder="Phone" id="lmPhone" value="${esc(saved.phone||'')}">
+        <button id="lmSubmit">Register / Continue Free</button>
+        <button class="lm-returning" id="lmReturningVip" type="button">Login</button>
+        <a class="lm-buy-link" href="${MARKET_URL}" target="_blank" rel="noopener"><span>Buy LasersMarket Access</span><small>$25,000</small></a>
+        <div class="lm-auth-status" id="lmAuthStatus"></div>
+        <div class="lm-auth-note">Free account memory saves recent searches. $25,000 Market Signals unlocks actual reading scores.</div>
       </div>
     </div>`;
   }
-  function mount(){css();if(document.querySelector('#lmAuth'))return;document.body.insertAdjacentHTML('beforeend',ui());let plan='free';document.querySelectorAll('[data-plan]').forEach(p=>p.onclick=()=>{document.querySelectorAll('[data-plan]').forEach(x=>x.classList.remove('active'));p.classList.add('active');plan=p.dataset.plan});document.getElementById('lmSubmit').onclick=()=>{const email=document.getElementById('lmEmail').value;const phone=document.getElementById('lmPhone').value;save({email,phone,plan,verified:true});if(plan!=='free'){window.open('https://shop.supportrd.com/products/supportrd-market-signals','_blank')}document.getElementById('lmAuth').remove();};}
-  if(!localStorage.getItem(KEY))document.addEventListener('DOMContentLoaded',mount,{once:true});})();
+  function renderAccountPop(){css();const auth=read();let pop=document.getElementById('lmAccountPop');if(!auth.verified){if(pop)pop.remove();return;}if(!pop){pop=document.createElement('aside');pop.id='lmAccountPop';pop.className='lm-account-pop';document.body.appendChild(pop)}const paid=isPaid(auth);pop.innerHTML=`<strong>${esc(displayName(auth))}</strong><span>${paid?'$25,000 Market Signals':'Free account'}</span><div class="lm-feature"><span>Free feature</span><b>Recent searches</b></div><div class="lm-feature"><span>Reading scores</span><b>${paid?'Unlocked':'$25,000 tier'}</b></div><button type="button" data-lm-open-login>Login Features</button>`}
+  function mount(){css();if(document.querySelector('#lmAuth'))return;document.getElementById('lmAccountPop')?.remove();document.body.insertAdjacentHTML('beforeend',ui());let plan='free';const status=t=>{const el=document.getElementById('lmAuthStatus');if(el){el.textContent=t;el.style.display='block'}};const finish=(auth,paid)=>{save(auth);if(paid)localStorage.setItem('lmMarketSignalsPaid','true');document.dispatchEvent(new CustomEvent('lm-auth-updated',{detail:auth}));document.getElementById('lmAuth')?.remove();renderAccountPop();};const unlock=(auth)=>finish(auth,true);document.querySelectorAll('[data-plan]').forEach(p=>p.onclick=()=>{document.querySelectorAll('[data-plan]').forEach(x=>x.classList.remove('active'));p.classList.add('active');plan=p.dataset.plan;document.getElementById('lmSubmit').textContent=plan==='free'?'Register / Continue Free':'Register + Open Market Signals'});document.getElementById('lmGoogleLogin').onclick=()=>{const email=document.getElementById('lmEmail').value;const ph=document.getElementById('lmPhone').value;if(ownerGoogle(email)){unlock({email,phone:ph,plan:'signals25000',provider:'google',verified:true,marketSignals:true,owner:true,marketSignalsUrl:MARKET_URL});return;}status('Google owner access only unlocks with zzzanthony123@gmail.com in the email field.');};document.getElementById('lmSubmit').onclick=()=>{const email=document.getElementById('lmEmail').value;const ph=document.getElementById('lmPhone').value;const auth={email,phone:ph,plan,verified:true,marketSignals:isPaid({plan}),marketSignalsUrl:MARKET_URL};if(isPaid(auth)){localStorage.setItem('lmMarketSignalsPaid','true');window.open(MARKET_URL,'_blank')}finish(auth,isPaid(auth));};document.getElementById('lmReturningVip').onclick=()=>{const email=document.getElementById('lmEmail').value;const ph=document.getElementById('lmPhone').value;if(ownerPhone(ph)){unlock({email,phone:phone(ph),plan:'signals25000',provider:'phone',verified:true,marketSignals:true,owner:true,returning:true,marketSignalsUrl:MARKET_URL});return;}const paid=plan==='signals25000';finish({email,phone:ph,plan:paid?'signals25000':'free',verified:true,marketSignals:paid,returning:true,marketSignalsUrl:MARKET_URL},paid);};}
+  window.LasersMarketAccess={isPaid:()=>{try{return isPaid(JSON.parse(localStorage.getItem(KEY)||'{}'))}catch{return localStorage.getItem('lmMarketSignalsPaid')==='true'}},buyUrl:MARKET_URL};
+  document.addEventListener('click',e=>{if(e.target.closest('[data-lm-open-login]'))mount()},true);
+  if(shouldMount())document.addEventListener('DOMContentLoaded',mount,{once:true});else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderAccountPop,{once:true});else renderAccountPop();})();
